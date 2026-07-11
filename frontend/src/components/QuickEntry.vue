@@ -236,9 +236,19 @@ async function deleteTx(tx) {
     ElMessage.success('已删除')
     loadHistory()
     loadCreditCard()
+    refreshAnalysis()
     emit('deleted')
   } catch (e) {
     ElMessage.error('删除失败')
+  }
+}
+
+async function refreshAnalysis() {
+  try {
+    const res = await fetch('/api/analysis/current').then(r => r.json())
+    analysis.value = res
+  } catch (e) {
+    analysis.value = null
   }
 }
 

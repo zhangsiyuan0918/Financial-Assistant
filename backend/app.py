@@ -128,6 +128,75 @@ def api_add_transaction():
     return jsonify(result)
 
 
+@app.route("/api/analysis/current")
+def api_current_analysis():
+    """获取当前月分析（不创建交易记录）"""
+    from utils.data_loader import _load_transactions, _load_budget_config
+    from datetime import datetime
+    month_str = datetime.now().strftime("%Y-%m")
+
+    transactions = _load_transactions()
+    month_txs = [t for t in transactions if t["date"][:7] == month_str]
+
+    # 区分支出和收入
+    total_expense = sum(float(t["amount"]) for t in month_txs if t["type"] != "收入")
+    total_income = sum(float(t["amount"]) for t in month_txs if t["type"] == "收入")
+
+    # 分类汇总
+    expense_by_category = {}
+    for t in month_txs:
+        if t["type"] != "收入":
+            cat = t["category"]
+            expense_by_category[cat] = expense_by_category.get(cat, 0) + float(t["amount"])
+
+    # 预算对比
+    budget_config = _load_budget_config()
+    budget_status = []
+    for cat, budget in budget_config.items():
+        if budget <= 0:
+            continue
+        spent = expense_by_category.get(cat, 0)
+        ratio = round(spent / budget * 100, 1) if budget else 0
+        budget_status.append({
+            "category": cat,
+            "budget": budget,
+            "spent": round(spent, 2),
+            "remaining": round(max(budget - spent, 0), 2),
+            "ratio": ratio,
+            "status": "超支" if ratio > 100 else ("偏高" if ratio > 80 else "正常"),
+        })
+
+    total_budget = sum(b for b in budget_config.values() if b > 0)
+    balance = total_income - total_expense
+
+    suggestions = []
+    if total_income > 0:
+        suggestions.append(f"💰 本月已记录收入 ¥{total_income:,.0f}")
+    if balance >= 0 and total_income > 0:
+        suggestions.append(f"✅ 本月结余 ¥{balance:,.0f}")
+    elif balance < 0 and total_income > 0:
+        suggestions.append(f"🔴 本月超支 ¥{abs(balance):,.0f}")
+
+    return jsonify({
+        "month_summary": {
+            "month": month_str,
+            "total_expense": round(total_expense, 2),
+            "total_income": round(total_income, 2),
+            "balance": round(balance, 2),
+            "count": len(month_txs),
+            "expense_by_category": {k: round(v, 2) for k, v in sorted(expense_by_category.items(), key=lambda x: -x[1])},
+        },
+        "budget": {
+            "total_budget": total_budget,
+            "total_spent": round(total_expense, 2),
+            "total_remaining": round(max(total_budget - total_expense, 0), 2),
+            "total_ratio": round(total_expense / total_budget * 100, 1) if total_budget else 0,
+            "items": sorted(budget_status, key=lambda x: -x["ratio"]),
+        },
+        "suggestions": suggestions,
+    })
+
+
 @app.route("/api/accounts")
 def api_list_accounts():
     from utils.data_loader import DEFAULT_ACCOUNTS, _load_transactions

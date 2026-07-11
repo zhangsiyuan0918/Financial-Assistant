@@ -1199,7 +1199,7 @@ def get_credit_card_status():
 
 
 def delete_transaction(created_at):
-    """删除指定 created_at 的交易记录，并反向恢复账户余额"""
+    """删除指定 created_at 的交易记录，并反向恢复余额"""
     conn = _get_manual_conn()
     cur = conn.cursor()
 
@@ -1213,16 +1213,37 @@ def delete_transaction(created_at):
     amount, tx_type, account = row
 
     # 反向恢复余额
-    if account:
-        # 删除支出 = 加回余额，删除收入 = 扣回余额
-        balance_change = float(amount) if tx_type == "支出" else -float(amount)
-        _update_account_balance(account, balance_change)
+    is_credit_card = account == "信用卡"
+    if tx_type == "支出" and is_credit_card:
+        # 删除信用卡消费：减少待还金额
+        _reverse_credit_card_expense(float(amount))
+    elif tx_type == "支出" and account:
+        # 删除普通支出：加回资产
+        _update_account_balance(account, float(amount))
+    elif tx_type == "收入" and account:
+        # 删除收入：扣回资产
+        _update_account_balance(account, -float(amount))
 
     # 删除记录
     cur.execute("DELETE FROM manual_transactions WHERE created_at = ?", (created_at,))
     conn.commit()
     conn.close()
     return True
+
+
+def _reverse_credit_card_expense(amount):
+    """反向恢复信用卡余额（删除消费时调用）"""
+    cc = _load_credit_card()
+    cc["balance"] = round(cc["balance"] - float(amount), 2)
+    cc["history"].append({
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "amount": round(float(amount), 2),
+        "type": "冲正",
+        "note": "删除消费记录",
+        "balance": cc["balance"],
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+    })
+    _save_credit_card(cc)
 
 
 def add_transaction(amount, category, note="", tx_type="支出", date=None, account=""):
