@@ -205,6 +205,7 @@ async function submit() {
     form.value = { date: today(), amount: null, note: '', category: '', account: '' }
 
     if (showHistory.value) loadHistory()
+    loadCreditCard()
   } catch (e) {
     ElMessage.error('记账失败')
   } finally {
@@ -234,6 +235,7 @@ async function deleteTx(tx) {
     await fetch(`/api/transaction/${encodeURIComponent(tx.created_at)}`, { method: 'DELETE' })
     ElMessage.success('已删除')
     loadHistory()
+    loadCreditCard()
     emit('deleted')
   } catch (e) {
     ElMessage.error('删除失败')
