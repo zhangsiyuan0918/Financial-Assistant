@@ -118,6 +118,12 @@ def check_token(token):
     return True
 
 
+def is_auth_configured():
+    """检查是否已配置密码"""
+    data = _load_auth()
+    return bool(data and data.get("password_hash"))
+
+
 # ---- Auth decorator ----
 
 # 不需要认证的路由

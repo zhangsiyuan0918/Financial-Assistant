@@ -5,7 +5,7 @@ from flask import Flask, jsonify, send_from_directory, request, session
 from flask_cors import CORS
 
 from config import FORECAST_FILE, MONTHLY_FILE, DATA_DIR, UPLOAD_DIR, V4_FILE, DB_PATH
-from auth import login, check_token, require_auth
+from auth import login, check_token, require_auth, is_auth_configured
 from utils import db, llm
 db.set_db_path(DB_PATH)
 from utils.query_engine import QueryEngine
@@ -708,7 +708,7 @@ def api_login():
 
 @app.route("/api/auth/status")
 def api_auth_status():
-    if require_auth() is None:
+    if not is_auth_configured():
         return jsonify({"authenticated": True, "configurable": False})
     token = request.headers.get("X-Auth-Token", "")
     if not token:
