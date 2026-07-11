@@ -4,42 +4,53 @@
       <span style="font-size:14px;font-weight:bold">记一笔</span>
     </template>
 
-    <el-form :model="form" inline size="default">
-      <el-form-item>
-        <el-radio-group v-model="form.type" size="small" @change="form.category = ''">
-          <el-radio-button value="支出">支出</el-radio-button>
-          <el-radio-button value="收入">收入</el-radio-button>
-        </el-radio-group>
-      </el-form-item>
-      <el-form-item label="日期">
-        <el-date-picker v-model="form.date" type="date" value-format="YYYY-MM-DD" style="width:120px" :shortcuts="dateShortcuts" />
-      </el-form-item>
-      <el-form-item label="金额">
-        <el-input-number v-model="form.amount" :min="0.01" :step="10" :precision="2" style="width:110px" placeholder="0.00" />
-      </el-form-item>
-      <el-form-item label="分类">
-        <el-select v-model="form.category" style="width:100px" placeholder="分类">
-          <el-option v-for="cat in currentCategories" :key="cat" :label="cat" :value="cat" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="账户">
-        <el-select v-model="form.account" style="width:110px" placeholder="账户">
-          <el-option v-for="acc in accounts" :key="acc" :label="acc" :value="acc" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="备注">
-        <el-input v-model="form.note" style="width:100px" placeholder="可选" clearable />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="submit" :loading="loading" :disabled="!form.amount || !form.category"
-          :style="{ background: form.type === '收入' ? '#67c23a' : '' }">
-          记账
-        </el-button>
-      </el-form-item>
+    <el-form :model="form" label-width="40px" size="default">
+      <el-row :gutter="8">
+        <el-col :span="4">
+          <el-form-item>
+            <el-radio-group v-model="form.type" size="small" @change="form.category = ''">
+              <el-radio-button value="支出">支出</el-radio-button>
+              <el-radio-button value="收入">收入</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+        </el-col>
+        <el-col :span="5">
+          <el-form-item label="日期">
+            <el-date-picker v-model="form.date" type="date" value-format="YYYY-MM-DD" style="width:100%" :shortcuts="dateShortcuts" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="4">
+          <el-form-item label="金额">
+            <el-input-number v-model="form.amount" :min="0.01" :step="10" :precision="2" style="width:100%" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="4">
+          <el-form-item label="分类">
+            <el-select v-model="form.category" style="width:100%" placeholder="分类">
+              <el-option v-for="cat in currentCategories" :key="cat" :label="cat" :value="cat" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="4">
+          <el-form-item label="账户">
+            <el-select v-model="form.account" style="width:100%" placeholder="账户">
+              <el-option v-for="acc in accounts" :key="acc" :label="acc" :value="acc" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="3">
+          <el-form-item>
+            <el-button type="primary" @click="submit" :loading="loading" :disabled="!form.amount || !form.category"
+              :style="{ background: form.type === '收入' ? '#67c23a' : '' }">
+              记账
+            </el-button>
+          </el-form-item>
+        </el-col>
+      </el-row>
     </el-form>
 
-    <div style="margin-top:8px">
-      <el-button size="small" @click="showHistory = !showHistory">
+    <div style="margin-top:4px">
+      <el-button size="small" text @click="showHistory = !showHistory">
         {{ showHistory ? '收起历史' : '查看历史记录' }}
       </el-button>
     </div>
@@ -60,7 +71,7 @@
 
       <div class="budget-bar">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
-          <span>本月支出 ¥{{ analysis.month_summary.total.toLocaleString() }}</span>
+          <span>本月支出 ¥{{ analysis.month_summary.total_expense.toLocaleString() }}</span>
           <span>预算 ¥{{ analysis.budget.total_budget.toLocaleString() }} ({{ analysis.budget.total_ratio }}%)</span>
         </div>
         <el-progress :percentage="Math.min(analysis.budget.total_ratio, 100)" :stroke-width="10"
@@ -98,7 +109,9 @@
             <span v-if="tx.note" style="font-size:12px;color:#999;margin-left:6px">{{ tx.note }}</span>
           </div>
           <span style="font-size:12px;color:#999;margin-right:8px">{{ tx.date }}</span>
-          <span style="font-size:13px;color:#f56c6c;font-weight:500;margin-right:8px">-¥{{ Number(tx.amount).toLocaleString() }}</span>
+          <span :style="{fontSize:'13px',fontWeight:500,marginRight:'8px',color: tx.type === '收入' ? '#67c23a' : '#f56c6c'}">
+            {{ tx.type === '收入' ? '+' : '-' }}¥{{ Number(tx.amount).toLocaleString() }}
+          </span>
           <el-button size="small" type="danger" text @click="deleteTx(tx)">删除</el-button>
         </div>
       </div>
@@ -170,7 +183,6 @@ async function loadHistory() {
   try {
     const txs = await fetchTransactions(historyMonth.value || undefined)
     historyList.value = txs
-    // 提取可用月份
     if (!historyMonths.value.length) {
       const allTxs = await fetchTransactions()
       const months = [...new Set(allTxs.map(t => t.date.slice(0, 7)))].sort().reverse()
@@ -204,7 +216,6 @@ onMounted(async () => {
 
 <style scoped>
 .quick-entry { margin-bottom: 12px; }
-.quick-entry :deep(.el-card__header) { overflow: visible; }
 .analysis-result { font-size: 13px; }
 .analysis-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .suggestions { margin-bottom: 8px; }
