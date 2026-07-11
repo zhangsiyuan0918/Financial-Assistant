@@ -34,19 +34,15 @@
     </el-row>
 
     <!-- 第二行：按钮 -->
-    <el-row :gutter="8" style="margin-top:8px">
-      <el-col :span="4">
-        <el-button type="primary" size="small" @click="submit" :loading="loading" :disabled="!form.amount || !form.category"
-          :style="{ background: form.type === '收入' ? '#67c23a' : '', borderColor: form.type === '收入' ? '#67c23a' : '' }">
-          记账
-        </el-button>
-      </el-col>
-      <el-col :span="4">
-        <el-button size="small" @click="showHistory = !showHistory">
-          {{ showHistory ? '收起历史' : '查看历史记录' }}
-        </el-button>
-      </el-col>
-    </el-row>
+    <div style="margin-top:8px;padding:8px;background:#f0f9eb;border:1px dashed #67c23a">
+      <div style="font-size:11px;color:#999;margin-bottom:4px">调试区域</div>
+      <el-button type="primary" size="small" @click="submit" :loading="loading" :disabled="!form.amount || !form.category">
+        记账
+      </el-button>
+      <el-button size="small" @click="showHistory = !showHistory">
+        {{ showHistory ? '收起历史' : '查看历史记录' }}
+      </el-button>
+    </div>
 
     <!-- 分析结果 -->
     <div v-if="analysis" class="analysis-result">
