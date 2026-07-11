@@ -1134,14 +1134,30 @@ def _save_transactions(rows):
 
 
 def delete_transaction(created_at):
-    """删除指定 created_at 的交易记录"""
+    """删除指定 created_at 的交易记录，并反向恢复账户余额"""
     conn = _get_manual_conn()
     cur = conn.cursor()
+
+    # 先查询要删除的记录
+    cur.execute("SELECT amount, type, account FROM manual_transactions WHERE created_at = ?", (created_at,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        return False
+
+    amount, tx_type, account = row
+
+    # 反向恢复余额
+    if account:
+        # 删除支出 = 加回余额，删除收入 = 扣回余额
+        balance_change = float(amount) if tx_type == "支出" else -float(amount)
+        _update_account_balance(account, balance_change)
+
+    # 删除记录
     cur.execute("DELETE FROM manual_transactions WHERE created_at = ?", (created_at,))
-    deleted = cur.rowcount > 0
     conn.commit()
     conn.close()
-    return deleted
+    return True
 
 
 def add_transaction(amount, category, note="", tx_type="支出", date=None, account=""):
