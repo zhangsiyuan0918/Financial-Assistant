@@ -118,11 +118,12 @@ def api_add_transaction():
     category = data.get("category")
     note = data.get("note", "")
     tx_type = data.get("type", "支出")
+    date = data.get("date")
 
     if not amount or not category:
         return jsonify({"error": "金额和分类必填"}), 400
 
-    result = add_transaction(float(amount), category, note, tx_type)
+    result = add_transaction(float(amount), category, note, tx_type, date)
     return jsonify(result)
 
 

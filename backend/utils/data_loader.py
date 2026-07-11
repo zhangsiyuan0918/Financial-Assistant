@@ -1120,12 +1120,12 @@ def _save_transactions(rows):
         writer.writerows(rows)
 
 
-def add_transaction(amount, category, note="", tx_type="支出"):
+def add_transaction(amount, category, note="", tx_type="支出", date=None):
     """记一笔账并返回实时分析"""
     from datetime import datetime
     now = datetime.now()
-    date_str = now.strftime("%Y-%m-%d")
-    month_str = now.strftime("%Y-%m")
+    date_str = date or now.strftime("%Y-%m-%d")
+    month_str = date_str[:7]
 
     tx = {
         "date": date_str,
@@ -1148,7 +1148,7 @@ def _analyze_after_transaction(tx):
     """记账后实时分析"""
     from datetime import datetime
     now = datetime.now()
-    month_str = now.strftime("%Y-%m")
+    month_str = tx["date"][:7]  # 使用交易日期所在月份
 
     transactions = _load_transactions()
     month_txs = [t for t in transactions if t["date"][:7] == month_str]

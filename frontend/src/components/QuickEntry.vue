@@ -8,16 +8,19 @@
     </template>
 
     <el-form :model="form" inline size="default">
+      <el-form-item label="日期">
+        <el-date-picker v-model="form.date" type="date" value-format="YYYY-MM-DD" style="width:140px" :shortcuts="dateShortcuts" />
+      </el-form-item>
       <el-form-item label="金额">
-        <el-input-number v-model="form.amount" :min="0.01" :step="10" :precision="2" style="width:140px" placeholder="0.00" />
+        <el-input-number v-model="form.amount" :min="0.01" :step="10" :precision="2" style="width:130px" placeholder="0.00" />
       </el-form-item>
       <el-form-item label="分类">
-        <el-select v-model="form.category" style="width:120px" placeholder="选择分类">
+        <el-select v-model="form.category" style="width:110px" placeholder="分类">
           <el-option v-for="cat in categories" :key="cat" :label="cat" :value="cat" />
         </el-select>
       </el-form-item>
       <el-form-item label="备注">
-        <el-input v-model="form.note" style="width:160px" placeholder="可选" clearable />
+        <el-input v-model="form.note" style="width:130px" placeholder="可选" clearable />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="submit" :loading="loading" :disabled="!form.amount || !form.category">
@@ -83,7 +86,17 @@ import { ElMessage } from 'element-plus'
 const emit = defineEmits(['recorded'])
 
 const categories = ['餐饮', '交通', '购物', '居住', '娱乐', '社交', '旅游', '车辆', '医疗', '个护', '学习', '数字消费', '其他']
-const form = ref({ amount: null, category: '', note: '' })
+
+function today() { return new Date().toISOString().slice(0, 10) }
+function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
+
+const dateShortcuts = [
+  { text: '今天', value: today() },
+  { text: '昨天', value: daysAgo(1) },
+  { text: '前天', value: daysAgo(2) },
+]
+
+const form = ref({ date: today(), amount: null, category: '', note: '' })
 const loading = ref(false)
 const analysis = ref(null)
 
@@ -94,7 +107,7 @@ async function submit() {
     const res = await fetch('/api/transaction', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form.value),
+      body: JSON.stringify({ ...form.value, date: form.value.date }),
     }).then(r => r.json())
 
     if (res.error) {
@@ -107,8 +120,7 @@ async function submit() {
     emit('recorded', res)
 
     // 重置表单
-    form.value.amount = null
-    form.value.note = ''
+    form.value = { date: today(), amount: null, note: '', category: '' }
   } catch (e) {
     ElMessage.error('记账失败')
   } finally {
