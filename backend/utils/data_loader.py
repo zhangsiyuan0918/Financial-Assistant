@@ -120,7 +120,9 @@ def get_overview():
     total_assets = cash_total + invest_total + restricted_total + receivables_total
 
     debt_total = sum(DEBT.values())
-    bills_total = sum(BILLS_PAYABLE.values())
+    # 信用卡余额从实时 JSON 读取，不再使用硬编码的 BILLS_PAYABLE
+    cc_data = _load_credit_card()
+    bills_total = cc_data["balance"]
     net_worth = total_assets - bills_total
 
     valid = df[df["valid_for_stats"] == "True"]
@@ -313,13 +315,23 @@ def update_assets(new_assets):
     now = datetime.now()
     month_str = now.strftime("%Y-%m")
 
-    # 校验格式：{ "现金/活期": { "招行储蓄卡": 123, ... }, ... }
     asset_config = _load_asset_config()
+    added = []
+    updated = []
+    skipped = []
+
     for layer, items in new_assets.items():
-        if layer in asset_config:
-            for name, amount in items.items():
-                if name in asset_config[layer]:
-                    asset_config[layer][name] = float(amount)
+        if layer not in asset_config:
+            skipped.append(f"层级「{layer}」不存在")
+            continue
+        for name, amount in items.items():
+            if name in asset_config[layer]:
+                asset_config[layer][name] = float(amount)
+                updated.append(name)
+            else:
+                # 新账户：添加到对应层级
+                asset_config[layer][name] = float(amount)
+                added.append(name)
 
     _save_asset_config(asset_config)
 
@@ -1002,16 +1014,19 @@ def _calc_goal_progress(goal, overview, budget_data):
 
 
 def create_goal(data):
+    from datetime import datetime
     goals = _load_goals()
+    # 使用时间戳避免 ID 重复
+    goal_id = f"goal_{datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]}"
     goal = {
-        "id": f"goal_{len(goals) + 1}",
+        "id": goal_id,
         "type": data.get("type", "save"),
         "name": data["name"],
         "target": float(data["target"]),
         "deadline": data.get("deadline", ""),
         "category": data.get("category", ""),
         "starting_net_worth": float(data.get("starting_net_worth", 0)),
-        "created_at": __import__("datetime").datetime.now().strftime("%Y-%m-%d"),
+        "created_at": datetime.now().strftime("%Y-%m-%d"),
     }
     goals.append(goal)
     _save_goals(goals)
@@ -1147,7 +1162,8 @@ def _load_transactions():
         rows = [{"id": r[0], "date": r[1], "amount": str(r[2]), "category": r[3], "type": r[4], "account": r[5], "note": r[6], "created_at": r[7]} for r in cur.fetchall()]
         conn.close()
         return rows
-    except Exception:
+    except Exception as e:
+        print(f"[WARNING] _load_transactions failed: {e}")
         return []
 
 
@@ -1476,7 +1492,18 @@ def _analyze_after_transaction(tx):
         },
         "suggestions": suggestions,
         "recent_5": recent_5,
-        "overview": get_overview(),
+        "overview": _lightweight_overview(),
+    }
+
+
+def _lightweight_overview():
+    """轻量级概览，仅计算净资产，不调用重型 get_overview()"""
+    asset_config = _load_asset_config()
+    total = sum(sum(items.values()) for items in asset_config.values())
+    cc = _load_credit_card()
+    return {
+        "net_worth": round(total - cc["balance"], 2),
+        "total_assets": round(total, 2),
     }
 
 
