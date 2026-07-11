@@ -80,13 +80,13 @@
     <!-- Net worth trend -->
     <el-card style="margin-top:4px">
       <template #header><span style="font-size:14px">净资产走势</span></template>
-      <div ref="netWorthChart" style="height:180px"></div>
+      <div ref="netWorthChart" style="height:220px;padding:8px 0"></div>
     </el-card>
 
     <!-- Liquid assets trend -->
     <el-card style="margin-top:4px">
       <template #header><span style="font-size:14px">活期资产走势（现金 + 投资）</span></template>
-      <div ref="liquidChart" style="height:180px"></div>
+      <div ref="liquidChart" style="height:220px;padding:8px 0"></div>
     </el-card>
 
     <!-- Asset detail + Budget in one row -->
@@ -339,7 +339,7 @@ function renderCharts() {
     createChart(liquidChart.value, {
       tooltip: { trigger: 'axis' },
       legend: { bottom: 0, textStyle: { fontSize: 11 } },
-      grid: { left: 60, right: 20, top: 20, bottom: 80 },
+      grid: { left: 60, right: 20, top: 20, bottom: 70 },
       xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45, fontSize: 11 } },
       yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
       series: [
