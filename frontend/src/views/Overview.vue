@@ -3,7 +3,7 @@
     <h2>总览</h2>
 
     <!-- Quick Entry -->
-    <QuickEntry @recorded="onRecorded" />
+    <QuickEntry @recorded="onRecorded" @deleted="onRecorded" />
 
     <!-- Core metrics: 3 cards -->
     <el-row :gutter="12">
@@ -296,7 +296,9 @@ async function doBackfill() {
 }
 
 function onRecorded(result) {
-  // 刷新预算数据
+  // 刷新所有相关数据
+  fetchOverview().then(data => { o.value = data })
+  fetchAssetHistory().then(data => { assetHistory.value = data })
   fetchBudget().then(data => { budget.value = data })
 }
 

@@ -119,7 +119,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { fetchTransactions } from '../api/index.js'
 
-const emit = defineEmits(['recorded'])
+const emit = defineEmits(['recorded', 'deleted'])
 
 const categories = ['餐饮', '交通', '购物', '居住', '娱乐', '社交', '旅游', '车辆', '医疗', '个护', '学习', '数字消费', '其他']
 const incomeCategories = ['工资', '奖金', '理财收益', '兼职', '退款', '红包', '其他收入']
@@ -195,6 +195,7 @@ async function deleteTx(tx) {
     await fetch(`/api/transaction/${encodeURIComponent(tx.created_at)}`, { method: 'DELETE' })
     ElMessage.success('已删除')
     loadHistory()
+    emit('deleted')
   } catch (e) {
     ElMessage.error('删除失败')
   }
