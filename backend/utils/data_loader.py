@@ -1143,8 +1143,8 @@ def _load_transactions():
     try:
         conn = _get_manual_conn()
         cur = conn.cursor()
-        cur.execute("SELECT date, amount, category, type, account, note, created_at FROM manual_transactions ORDER BY created_at DESC")
-        rows = [{"date": r[0], "amount": str(r[1]), "category": r[2], "type": r[3], "account": r[4], "note": r[5], "created_at": r[6]} for r in cur.fetchall()]
+        cur.execute("SELECT id, date, amount, category, type, account, note, created_at FROM manual_transactions ORDER BY created_at DESC")
+        rows = [{"id": r[0], "date": r[1], "amount": str(r[2]), "category": r[3], "type": r[4], "account": r[5], "note": r[6], "created_at": r[7]} for r in cur.fetchall()]
         conn.close()
         return rows
     except Exception:
@@ -1174,8 +1174,11 @@ def _save_credit_card(data):
 def add_credit_card_expense(amount, note=""):
     """信用卡消费：不扣减资产，增加待还金额"""
     from datetime import datetime
+    amt = float(amount)
+    if amt <= 0:
+        return {"error": "消费金额必须大于0"}
     cc = _load_credit_card()
-    cc["balance"] = round(cc["balance"] + float(amount), 2)
+    cc["balance"] = round(cc["balance"] + amt, 2)
     cc["history"].append({
         "date": datetime.now().strftime("%Y-%m-%d"),
         "amount": round(float(amount), 2),
@@ -1191,8 +1194,17 @@ def add_credit_card_expense(amount, note=""):
 def pay_credit_card(amount, account="招行储蓄卡"):
     """信用卡还款：扣减资产，减少待还金额"""
     from datetime import datetime
+    amt = float(amount)
+    if amt <= 0:
+        return {"error": "还款金额必须大于0"}
+    if amt < 0:
+        return {"error": "还款金额不能为负数"}
+
     cc = _load_credit_card()
-    pay_amount = min(float(amount), cc["balance"])
+    original_amount = amt
+    pay_amount = min(amt, cc["balance"])
+    overpaid = amt > cc["balance"]
+
     cc["balance"] = round(cc["balance"] - pay_amount, 2)
     cc["history"].append({
         "date": datetime.now().strftime("%Y-%m-%d"),
@@ -1212,6 +1224,13 @@ def pay_credit_card(amount, account="招行储蓄卡"):
 
     result = cc.copy()
     result["balance_ok"] = balance_ok
+    result["pay_amount"] = round(pay_amount, 2)
+    result["overpaid"] = overpaid
+    if overpaid:
+        result["warning"] = f"还款金额 ¥{original_amount:,.0f} 超过待还 ¥{cc['balance'] + pay_amount:,.0f}，实际还款 ¥{pay_amount:,.0f}"
+    if not balance_ok and account:
+        result["warning"] = result.get("warning", "") + f" 账户「{account}」未在资产配置中找到"
+    return result
     if not balance_ok and account:
         result["warning"] = f"账户「{account}」未在资产配置中找到，余额未扣减"
     return result
@@ -1226,13 +1245,13 @@ def get_credit_card_status():
     }
 
 
-def delete_transaction(created_at):
-    """删除指定 created_at 的交易记录，并反向恢复余额"""
+def delete_transaction(tx_id):
+    """删除指定 ID 的交易记录，并反向恢复余额"""
     conn = _get_manual_conn()
     cur = conn.cursor()
 
     # 先查询要删除的记录
-    cur.execute("SELECT amount, type, account FROM manual_transactions WHERE created_at = ?", (created_at,))
+    cur.execute("SELECT amount, type, account FROM manual_transactions WHERE id = ?", (tx_id,))
     row = cur.fetchone()
     if not row:
         conn.close()
@@ -1253,7 +1272,7 @@ def delete_transaction(created_at):
             balance_ok = False
 
     # 删除记录
-    cur.execute("DELETE FROM manual_transactions WHERE created_at = ?", (created_at,))
+    cur.execute("DELETE FROM manual_transactions WHERE id = ?", (tx_id,))
     conn.commit()
     conn.close()
 
@@ -1282,10 +1301,20 @@ def _reverse_credit_card_expense(amount):
 def add_transaction(amount, category, note="", tx_type="支出", date=None, account=""):
     """记一笔账并返回实时分析"""
     from datetime import datetime
+
+    # 输入校验
+    try:
+        amt = round(float(amount), 2)
+    except (ValueError, TypeError):
+        return {"error": "金额必须是有效数字"}
+    if amt <= 0:
+        return {"error": "金额必须大于0"}
+    if tx_type not in ("支出", "收入"):
+        return {"error": "类型必须是支出或收入"}
+
     now = datetime.now()
     date_str = date or now.strftime("%Y-%m-%d")
     created_at = now.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-    amt = round(float(amount), 2)
 
     # 1. 写入流水
     conn = _get_manual_conn()
@@ -1294,6 +1323,7 @@ def add_transaction(amount, category, note="", tx_type="支出", date=None, acco
         "INSERT INTO manual_transactions (date, amount, category, type, account, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (date_str, amt, category, tx_type, account, note, created_at)
     )
+    tx_id = cur.lastrowid
     conn.commit()
     conn.close()
 
@@ -1310,6 +1340,7 @@ def add_transaction(amount, category, note="", tx_type="支出", date=None, acco
             balance_ok = False
 
     tx = {
+        "id": tx_id,
         "date": date_str,
         "amount": str(amt),
         "category": category,

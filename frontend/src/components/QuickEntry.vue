@@ -228,7 +228,7 @@ async function loadHistory() {
 
 async function deleteTx(tx) {
   try {
-    await deleteTransactionApi(tx.created_at)
+    await deleteTransactionApi(tx.id)
     ElMessage.success('已删除')
     loadHistory()
     loadCreditCard()

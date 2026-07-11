@@ -149,7 +149,12 @@ def api_add_transaction():
     if not amount or not category:
         return jsonify({"error": "金额和分类必填"}), 400
 
-    result = add_transaction(float(amount), category, note, tx_type, date, account)
+    try:
+        amount = float(amount)
+    except (ValueError, TypeError):
+        return jsonify({"error": "金额必须是有效数字"}), 400
+
+    result = add_transaction(amount, category, note, tx_type, date, account)
     return jsonify(result)
 
 
@@ -243,7 +248,11 @@ def api_pay_credit_card():
     account = data.get("account", "招行储蓄卡")
     if not amount:
         return jsonify({"error": "还款金额必填"}), 400
-    result = pay_credit_card(float(amount), account)
+    try:
+        amount = float(amount)
+    except (ValueError, TypeError):
+        return jsonify({"error": "金额必须是有效数字"}), 400
+    result = pay_credit_card(amount, account)
     return jsonify(result)
 
 
@@ -259,12 +268,12 @@ def api_list_transactions():
     return jsonify(txs)
 
 
-@app.route("/api/transaction/<created_at>", methods=["DELETE"])
-def api_delete_transaction(created_at):
-    removed = delete_transaction(created_at)
-    if removed:
-        return jsonify({"status": "ok"})
-    return jsonify({"error": "记录不存在"}), 404
+@app.route("/api/transaction/<int:tx_id>", methods=["DELETE"])
+def api_delete_transaction(tx_id):
+    result = delete_transaction(tx_id)
+    if result.get("success"):
+        return jsonify(result)
+    return jsonify(result), 404
 
 
 @app.route("/api/health")
