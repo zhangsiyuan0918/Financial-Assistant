@@ -1,13 +1,4 @@
 {
-  "balance": 1496.8,
-  "history": [
-    {
-      "date": "2026-07-11",
-      "amount": 45.9,
-      "type": "消费",
-      "note": "必胜客",
-      "balance": 1496.8,
-      "created_at": "2026-07-11 18:42:41.570"
-    }
-  ]
+  "balance": 1450.9,
+  "history": []
 }
