@@ -205,7 +205,7 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
+<style>
 .quick-entry { margin-bottom: 12px; }
 .analysis-result { font-size: 13px; }
 .analysis-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
