@@ -34,17 +34,18 @@
     </el-row>
 
     <!-- 第二行：按钮 -->
-    <div style="margin-top:8px;padding:8px;background:#f0f9eb;border:1px dashed #67c23a">
-      <div style="font-size:11px;color:#999;margin-bottom:4px">调试区域</div>
-      <button @click="submit" :disabled="!form.amount || !form.category"
-        style="padding:6px 16px;background:#409eff;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-right:8px">
-        记账
-      </button>
-      <button @click="showHistory = !showHistory"
-        style="padding:6px 16px;background:#fff;color:#333;border:1px solid #dcdfe6;border-radius:4px;cursor:pointer">
-        {{ showHistory ? '收起历史' : '查看历史记录' }}
-      </button>
-    </div>
+    <el-row :gutter="8" style="margin-top:8px">
+      <el-col :span="4">
+        <el-button type="primary" size="small" @click="submit" :loading="loading" :disabled="!form.amount || !form.category">
+          记账
+        </el-button>
+      </el-col>
+      <el-col :span="4">
+        <el-button size="small" @click="showHistory = !showHistory">
+          {{ showHistory ? '收起历史' : '查看历史记录' }}
+        </el-button>
+      </el-col>
+    </el-row>
 
     <!-- 分析结果 -->
     <div v-if="analysis" class="analysis-result">
@@ -205,8 +206,10 @@ onMounted(async () => {
 })
 </script>
 
+<!-- 注意：不能使用 scoped，会导致 Element Plus 组件渲染异常 -->
 <style>
 .quick-entry { margin-bottom: 12px; }
+.quick-entry .el-card__header { overflow: visible; }
 .analysis-result { font-size: 13px; }
 .analysis-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .suggestions { margin-bottom: 8px; }
