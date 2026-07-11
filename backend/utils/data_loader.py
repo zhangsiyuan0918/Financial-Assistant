@@ -327,6 +327,7 @@ def backfill_asset_history():
     """
     回填历史资产快照：用收支数据估算过去每月净资产。
     从当前净资产出发，逐月倒推。
+    已有实际数据的月份完全保留，只填充缺失月份。
     """
     import csv as csv_mod
 
@@ -343,8 +344,6 @@ def backfill_asset_history():
     months = sorted(monthly.index)
 
     # 从当前月往前倒推，计算每月净资产
-    # 当前月净资产 = current_net_worth
-    # 上月净资产 = 当前月净资产 - (当月收入 - 当月支出)
     snapshots = []
     running_balance = current_net_worth
 
@@ -353,7 +352,6 @@ def backfill_asset_history():
         expense = monthly.loc[month, "支出"] if "支出" in monthly.columns else 0
         net = income - expense
 
-        # 该月初净资产 = 月末净资产 - 净收入
         snapshots.append({
             "month": month,
             "net_worth": round(running_balance, 2),
@@ -361,46 +359,41 @@ def backfill_asset_history():
         running_balance -= net
 
     snapshots.reverse()
+    snapshot_map = {s["month"]: s["net_worth"] for s in snapshots}
 
-    # 读取现有快照
-    existing = {}
+    # 读取现有快照（保留原始行数据）
+    existing_rows = []
+    existing_months = set()
     if os.path.exists(ASSET_HISTORY_FILE):
         with open(ASSET_HISTORY_FILE, "r", encoding="utf-8-sig") as f:
             reader = csv_mod.DictReader(f)
             for row in reader:
-                m = row["month"]
-                if m not in existing:
-                    existing[m] = {"total": 0, "layers": {}}
-                amt = float(row.get("amount", 0))
-                existing[m]["total"] += amt
-                existing[m]["layers"][row["layer"]] = existing[m]["layers"].get(row["layer"], 0) + amt
+                existing_rows.append(row)
+                existing_months.add(row["month"])
 
-    # 合并：已有数据保留，缺失的用估算值填充
-    all_months = sorted(set(list(existing.keys()) + [s["month"] for s in snapshots]))
-    snapshot_map = {s["month"]: s["net_worth"] for s in snapshots}
+    # 找出缺失月份
+    missing_months = [s["month"] for s in snapshots if s["month"] not in existing_months]
 
+    # 为缺失月份生成估算行
     new_rows = []
-    for month in all_months:
-        if month in existing:
-            # 保留原有数据
-            for layer, amt in existing[month]["layers"].items():
-                new_rows.append({"month": month, "layer": layer, "item": "estimation", "amount": round(amt, 2)})
-        elif month in snapshot_map:
-            # 用估算值（按比例分配到各层）
-            nw = snapshot_map[month]
-            # 简单分配：现金20%，投资40%，受限30%，应收10%
-            new_rows.append({"month": month, "layer": "现金/活期", "item": "estimation", "amount": round(nw * 0.20, 2)})
-            new_rows.append({"month": month, "layer": "投资资产", "item": "estimation", "amount": round(nw * 0.40, 2)})
-            new_rows.append({"month": month, "layer": "受限资产", "item": "estimation", "amount": round(nw * 0.30, 2)})
-            new_rows.append({"month": month, "layer": "应收", "item": "estimation", "amount": round(nw * 0.10, 2)})
+    for month in missing_months:
+        nw = snapshot_map[month]
+        # 按历史比例分配：现金20%，投资40%，受限30%，应收10%
+        new_rows.append({"month": month, "layer": "现金/活期", "item": "estimation", "amount": round(nw * 0.20, 2)})
+        new_rows.append({"month": month, "layer": "投资资产", "item": "estimation", "amount": round(nw * 0.40, 2)})
+        new_rows.append({"month": month, "layer": "受限资产", "item": "estimation", "amount": round(nw * 0.30, 2)})
+        new_rows.append({"month": month, "layer": "应收", "item": "estimation", "amount": round(nw * 0.10, 2)})
+
+    # 合并：原有数据 + 新增估算数据
+    all_rows = existing_rows + new_rows
 
     # 写入文件
     with open(ASSET_HISTORY_FILE, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv_mod.DictWriter(f, fieldnames=["month", "layer", "item", "amount"])
         writer.writeheader()
-        writer.writerows(new_rows)
+        writer.writerows(all_rows)
 
-    return {"months": len(all_months), "snapshots": len(new_rows)}
+    return {"months": len(existing_months) + len(missing_months), "added": len(missing_months), "preserved": len(existing_months)}
 
 
 def update_budget(new_budget):
