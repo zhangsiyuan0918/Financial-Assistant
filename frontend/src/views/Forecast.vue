@@ -117,15 +117,15 @@ onMounted(async () => {
     if (forecastChart.value) {
       createChart(forecastChart.value, {
         tooltip: { trigger: 'axis' },
-        grid: { left: 80, right: 20, bottom: 40 },
-        xAxis: { type: 'category', data: data.data.map(d => d.month), axisLabel: { rotate: 45 } },
+        grid: { left: 80, right: 20, top: 20, bottom: 80 },
+        xAxis: { type: 'category', data: data.data.map(d => d.month), axisLabel: { rotate: 45, fontSize: 11 } },
         yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
         series: [
           { name: '预测值', type: 'line', data: data.data.map(d => d.prediction), smooth: true, symbol: 'circle', lineStyle: { width: 3 }, itemStyle: { color: '#409eff' } },
           { name: '上限', type: 'line', data: data.data.map(d => d.upper), lineStyle: { type: 'dashed', width: 1 }, symbol: 'none', itemStyle: { color: '#b3d8ff' } },
           { name: '下限', type: 'line', data: data.data.map(d => d.lower), lineStyle: { type: 'dashed', width: 1 }, symbol: 'none', itemStyle: { color: '#b3d8ff' } },
         ],
-        legend: { bottom: 0 },
+        legend: { bottom: 0, textStyle: { fontSize: 11 } },
       })
     }
 
@@ -134,9 +134,9 @@ onMounted(async () => {
       const bt = backtestData.value
       createChart(backtestChart.value, {
         tooltip: { trigger: 'axis' },
-        grid: { left: 80, right: 20, bottom: 40 },
-        legend: { bottom: 0 },
-        xAxis: { type: 'category', data: bt.map(d => d.month), axisLabel: { rotate: 45 } },
+        grid: { left: 80, right: 20, top: 20, bottom: 80 },
+        legend: { bottom: 0, textStyle: { fontSize: 11 } },
+        xAxis: { type: 'category', data: bt.map(d => d.month), axisLabel: { rotate: 45, fontSize: 11 } },
         yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
         series: [
           { name: '预测值', type: 'bar', data: bt.map(d => d.predicted), itemStyle: { color: '#409eff' } },

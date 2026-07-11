@@ -60,7 +60,7 @@ onMounted(async () => {
     }
     if (trendChart.value) {
       createChart(trendChart.value, {
-        tooltip: { trigger: 'axis' }, grid: { left: 60, right: 20, bottom: 40 },
+        tooltip: { trigger: 'axis' }, grid: { left: 60, right: 20, bottom: 60 },
         xAxis: { type: 'category', data: data.value.trend.map(d => d.month), axisLabel: { rotate: 45 } },
         yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
         series: [{ type: 'bar', data: data.value.trend.map(d => d.amount), itemStyle: { color: '#67c23a' } }],

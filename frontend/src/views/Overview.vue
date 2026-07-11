@@ -324,7 +324,7 @@ function renderCharts() {
     const data = assetHistory.value
     createChart(netWorthChart.value, {
       tooltip: { trigger: 'axis' },
-      grid: { left: 60, right: 20, bottom: 40 },
+      grid: { left: 60, right: 20, bottom: 60 },
       xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45 } },
       yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
       series: [{
@@ -339,7 +339,7 @@ function renderCharts() {
     createChart(liquidChart.value, {
       tooltip: { trigger: 'axis' },
       legend: { bottom: 0 },
-      grid: { left: 60, right: 20, bottom: 40 },
+      grid: { left: 60, right: 20, bottom: 60 },
       xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45 } },
       yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
       series: [
@@ -394,7 +394,7 @@ onMounted(async () => {
       const data = assetHistory.value
       createChart(netWorthChart.value, {
         tooltip: { trigger: 'axis' },
-        grid: { left: 60, right: 20, bottom: 40 },
+        grid: { left: 60, right: 20, bottom: 60 },
         xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45 } },
         yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
         series: [{
@@ -413,7 +413,7 @@ onMounted(async () => {
           return s
         }},
         legend: { bottom: 0 },
-        grid: { left: 60, right: 20, bottom: 40 },
+        grid: { left: 60, right: 20, bottom: 60 },
         xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45 } },
         yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
         series: [

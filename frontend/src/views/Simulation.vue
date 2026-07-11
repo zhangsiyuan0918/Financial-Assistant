@@ -117,7 +117,7 @@ async function runForward() {
   nextTick(() => {
     if (simChart.value) {
       const c = createChart(simChart.value, {
-        tooltip: { trigger: 'axis' }, grid: { left: 80, bottom: 40 },
+        tooltip: { trigger: 'axis' }, grid: { left: 80, bottom: 60 },
         xAxis: { type: 'category', data: fwd.value.projection.map(d => '第' + d.year + '年') },
         yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
         series: [{ type: 'line', data: fwd.value.projection.map(d => d.net_worth), smooth: true, areaStyle: { opacity: 0.2 }, lineStyle: { width: 3 } }],
