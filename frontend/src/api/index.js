@@ -101,3 +101,7 @@ export function deleteTransactionApi(txId) { return api.delete(`/transaction/${t
 export function fetchCurrentAnalysis() { return api.get('/analysis/current').then(r => r.data) }
 export function fetchAccountsApi() { return api.get('/accounts').then(r => r.data) }
 export function suggestCategory(text) { return api.get('/suggest-category', { params: { text } }).then(r => r.data) }
+export function fetchTemplates() { return api.get('/templates').then(r => r.data) }
+export function createTemplate(data) { return api.post('/templates', data).then(r => r.data) }
+export function deleteTemplate(id) { return api.delete(`/templates/${id}`).then(r => r.data) }
+export function applyTemplate(id) { return api.post(`/templates/${id}/apply`).then(r => r.data) }

@@ -9,7 +9,7 @@ from auth import login, check_token, require_auth, is_auth_configured
 from utils import db, llm
 db.set_db_path(DB_PATH)
 from utils.query_engine import QueryEngine
-from utils.data_loader import get_overview, get_spending, get_monthly_trend, get_category_detail, get_income_analysis, get_asset_history, get_portfolio, get_seasonal_patterns, get_budget_status, get_monthly_report, update_assets, update_budget, get_alerts, resolve_alert, get_goals, create_goal, update_goal, delete_goal, get_financial_health, get_comparison, get_annual_report, add_transaction, delete_transaction, get_quick_stats, pay_credit_card, get_credit_card_status, suggest_category
+from utils.data_loader import get_overview, get_spending, get_monthly_trend, get_category_detail, get_income_analysis, get_asset_history, get_portfolio, get_seasonal_patterns, get_budget_status, get_monthly_report, update_assets, update_budget, get_alerts, resolve_alert, get_goals, create_goal, update_goal, delete_goal, get_financial_health, get_comparison, get_annual_report, add_transaction, delete_transaction, get_quick_stats, pay_credit_card, get_credit_card_status, suggest_category, get_templates, create_template, delete_template, apply_template
 from utils.pipeline import run_full_pipeline, run_forecast_only
 
 app = Flask(__name__, static_folder=None)
@@ -691,6 +691,41 @@ def api_goal_detail(goal_id):
         return jsonify(delete_goal(goal_id))
     data = request.get_json(force=True)
     return jsonify(update_goal(goal_id, data))
+
+
+# ---- Templates ----
+
+@app.route("/api/templates")
+def api_list_templates():
+    return jsonify(get_templates())
+
+
+@app.route("/api/templates", methods=["POST"])
+def api_create_template():
+    data = request.get_json(force=True)
+    name = data.get("name")
+    amount = data.get("amount")
+    category = data.get("category")
+    if not name or not amount or not category:
+        return jsonify({"error": "名称、金额、分类必填"}), 400
+    result = create_template(
+        name=name, amount=float(amount), category=category,
+        tx_type=data.get("type", "支出"), account=data.get("account", ""),
+        note=data.get("note", ""), frequency=data.get("frequency", "monthly")
+    )
+    return jsonify(result)
+
+
+@app.route("/api/templates/<template_id>", methods=["DELETE"])
+def api_delete_template(template_id):
+    result = delete_template(template_id)
+    return jsonify(result)
+
+
+@app.route("/api/templates/<template_id>/apply", methods=["POST"])
+def api_apply_template(template_id):
+    result = apply_template(template_id)
+    return jsonify(result)
 
 
 # ---- Auth ----

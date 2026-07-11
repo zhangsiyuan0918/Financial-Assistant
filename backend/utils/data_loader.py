@@ -4,7 +4,7 @@ import os
 import pandas as pd
 from collections import defaultdict
 import sys, os; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import V4_FILE, DB_PATH, ASSET_LAYERS, CASH_LIQUID, INVESTMENT, RESTRICTED, RECEIVABLES, DEBT, BILLS_PAYABLE, ASSET_HISTORY_FILE, ASSET_CONFIG_FILE, BUDGET_CONFIG_FILE, MONTHLY_SALARY, QUARTERLY_BONUS, PORTFOLIO, MONTHLY_BUDGET, ALERTS_FILE, GOALS_FILE, FORECAST_FILE, CREDIT_CARD_FILE
+from config import V4_FILE, DB_PATH, ASSET_LAYERS, CASH_LIQUID, INVESTMENT, RESTRICTED, RECEIVABLES, DEBT, BILLS_PAYABLE, ASSET_HISTORY_FILE, ASSET_CONFIG_FILE, BUDGET_CONFIG_FILE, MONTHLY_SALARY, QUARTERLY_BONUS, PORTFOLIO, MONTHLY_BUDGET, ALERTS_FILE, GOALS_FILE, FORECAST_FILE, CREDIT_CARD_FILE, TEMPLATES_FILE
 from utils import db
 db.set_db_path(DB_PATH)
 
@@ -1527,6 +1527,70 @@ def get_quick_stats():
         "count": len(month_txs),
         "by_category": {k: round(v, 2) for k, v in sorted(by_category.items(), key=lambda x: -x[1])},
     }
+
+
+# ===================== 周期性交易模板 =====================
+
+def _load_templates():
+    """加载交易模板"""
+    if os.path.exists(TEMPLATES_FILE):
+        with open(TEMPLATES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+
+def _save_templates(data):
+    with _file_locks["goals"]:  # 复用一把锁
+        _atomic_write(TEMPLATES_FILE, data)
+
+
+def get_templates():
+    """获取所有模板"""
+    return _load_templates()
+
+
+def create_template(name, amount, category, tx_type="支出", account="", note="", frequency="monthly"):
+    """创建交易模板"""
+    from datetime import datetime
+    templates = _load_templates()
+    template = {
+        "id": f"tpl_{datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]}",
+        "name": name,
+        "amount": round(float(amount), 2),
+        "category": category,
+        "type": tx_type,
+        "account": account,
+        "note": note,
+        "frequency": frequency,  # monthly/weekly/yearly
+        "created_at": datetime.now().strftime("%Y-%m-%d"),
+    }
+    templates.append(template)
+    _save_templates(templates)
+    return templates
+
+
+def delete_template(template_id):
+    """删除模板"""
+    templates = _load_templates()
+    templates = [t for t in templates if t["id"] != template_id]
+    _save_templates(templates)
+    return templates
+
+
+def apply_template(template_id):
+    """应用模板创建一笔交易"""
+    templates = _load_templates()
+    for t in templates:
+        if t["id"] == template_id:
+            result = add_transaction(
+                amount=t["amount"],
+                category=t["category"],
+                note=t["name"],
+                tx_type=t["type"],
+                account=t.get("account", ""),
+            )
+            return result
+    return {"error": "模板不存在"}
 
 
 # ===================== 智能分类推荐 =====================

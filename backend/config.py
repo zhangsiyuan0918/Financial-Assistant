@@ -48,6 +48,9 @@ BILLS_PAYABLE = {"信用卡（下月账单）": 1450.90}
 # 信用卡账单文件
 CREDIT_CARD_FILE = os.path.join(DATA_DIR, "信用卡账单.json")
 
+# 周期性交易模板
+TEMPLATES_FILE = os.path.join(DATA_DIR, "交易模板.json")
+
 # 月收入
 MONTHLY_SALARY = 16000
 QUARTERLY_BONUS = 10610

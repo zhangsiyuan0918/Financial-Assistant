@@ -1,8 +1,46 @@
 <template>
   <el-card style="margin-bottom:12px">
     <template #header>
-      <span style="font-size:14px;font-weight:bold">记一笔</span>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:14px;font-weight:bold">记一笔</span>
+        <el-button size="small" text @click="showTemplateForm = !showTemplateForm">
+          {{ showTemplateForm ? '关闭' : '+ 添加模板' }}
+        </el-button>
+      </div>
     </template>
+
+    <!-- 常用模板快捷按钮 -->
+    <div v-if="templates.length" style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">
+      <button v-for="t in templates" :key="t.id" @click="applyTpl(t)"
+        style="padding:4px 10px;background:#f0f9eb;color:#67c23a;border:1px solid #b3e19d;border-radius:4px;cursor:pointer;font-size:12px">
+        {{ t.name }} ¥{{ t.amount.toLocaleString() }}
+      </button>
+    </div>
+
+    <!-- 创建模板表单 -->
+    <div v-if="showTemplateForm" style="margin-bottom:10px;padding:10px;background:#f5f7fa;border-radius:4px">
+      <div style="font-size:12px;color:#999;margin-bottom:6px">创建常用模板</div>
+      <el-row :gutter="6" align="middle">
+        <el-col :span="5"><el-input v-model="tplForm.name" size="small" placeholder="模板名称" /></el-col>
+        <el-col :span="4"><el-input-number v-model="tplForm.amount" size="small" :min="0.01" :step="10" :precision="2" style="width:100%" /></el-col>
+        <el-col :span="4">
+          <el-select v-model="tplForm.category" size="small" style="width:100%" placeholder="分类">
+            <el-option v-for="cat in currentCategories" :key="cat" :label="cat" :value="cat" />
+          </el-select>
+        </el-col>
+        <el-col :span="4">
+          <el-select v-model="tplForm.type" size="small" style="width:100%">
+            <el-option label="支出" value="支出" />
+            <el-option label="收入" value="收入" />
+          </el-select>
+        </el-col>
+        <el-col :span="3">
+          <el-button size="small" type="primary" @click="saveTpl" :disabled="!tplForm.name || !tplForm.amount || !tplForm.category">
+            保存
+          </el-button>
+        </el-col>
+      </el-row>
+    </div>
 
     <!-- 输入字段 -->
     <el-row :gutter="8" align="middle">
@@ -163,7 +201,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { fetchTransactions, fetchCreditCard, payCreditCard, addTransactionApi, deleteTransactionApi, fetchCurrentAnalysis, fetchAccountsApi, suggestCategory } from '../api/index.js'
+import { fetchTransactions, fetchCreditCard, payCreditCard, addTransactionApi, deleteTransactionApi, fetchCurrentAnalysis, fetchAccountsApi, suggestCategory, fetchTemplates, createTemplate, applyTemplate as applyTemplateApi } from '../api/index.js'
 
 const emit = defineEmits(['recorded', 'deleted'])
 
@@ -195,6 +233,9 @@ const payAmount = ref(0)
 const payAccount = ref('招行储蓄卡')
 const suggestions = ref([])
 let suggestTimer = null
+const templates = ref([])
+const showTemplateForm = ref(false)
+const tplForm = ref({ name: '', amount: null, category: '', type: '支出' })
 
 async function submit() {
   if (!form.value.amount || !form.value.category) return
@@ -263,10 +304,46 @@ async function refreshAnalysis() {
 onMounted(async () => {
   loadHistory()
   loadCreditCard()
+  loadTemplates()
   try {
     accounts.value = await fetchAccountsApi()
   } catch {}
 })
+
+async function loadTemplates() {
+  try {
+    templates.value = await fetchTemplates()
+  } catch {}
+}
+
+async function saveTpl() {
+  try {
+    await createTemplate(tplForm.value)
+    ElMessage.success('模板已保存')
+    tplForm.value = { name: '', amount: null, category: '', type: '支出' }
+    showTemplateForm.value = false
+    loadTemplates()
+  } catch (e) {
+    ElMessage.error('保存失败')
+  }
+}
+
+async function applyTpl(t) {
+  try {
+    const res = await applyTemplateApi(t.id)
+    if (res.error) {
+      ElMessage.error(res.error)
+      return
+    }
+    analysis.value = res
+    ElMessage.success(`已记录「${t.name}」`)
+    emit('recorded', res)
+    loadHistory()
+    loadCreditCard()
+  } catch (e) {
+    ElMessage.error('记账失败')
+  }
+}
 
 async function loadCreditCard() {
   try {
