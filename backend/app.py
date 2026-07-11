@@ -315,16 +315,16 @@ def api_spending():
     return jsonify(get_spending(year))
 
 
-@app.route("/api/spending/<category>")
-def api_spending_detail(category):
-    year = request.args.get("year", "all")
-    return jsonify(get_category_detail(category, year))
-
-
 @app.route("/api/spending/habits")
 def api_spending_habits():
     """消费习惯分析"""
     return jsonify(get_spending_habits())
+
+
+@app.route("/api/spending/<category>")
+def api_spending_detail(category):
+    year = request.args.get("year", "all")
+    return jsonify(get_category_detail(category, year))
 
 
 @app.route("/api/monthly")
