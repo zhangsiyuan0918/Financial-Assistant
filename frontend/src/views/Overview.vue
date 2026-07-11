@@ -295,11 +295,60 @@ async function doBackfill() {
   }
 }
 
-function onRecorded(result) {
+async function onRecorded(result) {
   // 刷新所有相关数据
-  fetchOverview().then(data => { o.value = data })
-  fetchAssetHistory().then(data => { assetHistory.value = data })
-  fetchBudget().then(data => { budget.value = data })
+  o.value = await fetchOverview()
+  assetHistory.value = await fetchAssetHistory()
+  budget.value = await fetchBudget()
+
+  // 重新渲染图表
+  nextTick(() => renderCharts())
+}
+
+function renderCharts() {
+  // Layer pie chart
+  if (layerChart.value) {
+    const layersData = o.value.layers.filter(l => l.total > 0)
+    createChart(layerChart.value, {
+      tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
+      series: [{
+        type: 'pie', radius: ['35%', '65%'],
+        data: layersData.map(l => ({ name: l.layer, value: l.total })),
+        label: { formatter: '{b}\n{d}%' },
+        color: ['#409eff', '#e6a23c', '#909399', '#67c23a'],
+      }],
+    })
+  }
+  // Net worth trend
+  if (netWorthChart.value && assetHistory.value.length) {
+    const data = assetHistory.value
+    createChart(netWorthChart.value, {
+      tooltip: { trigger: 'axis' },
+      grid: { left: 60, right: 20, bottom: 40 },
+      xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45 } },
+      yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
+      series: [{
+        name: '净资产', type: 'line', data: data.map(d => d.total),
+        smooth: true, areaStyle: { opacity: 0.15 }, lineStyle: { width: 2 },
+      }],
+    })
+  }
+  // Liquid assets trend
+  if (liquidChart.value && assetHistory.value.length) {
+    const data = assetHistory.value
+    createChart(liquidChart.value, {
+      tooltip: { trigger: 'axis' },
+      legend: { bottom: 0 },
+      grid: { left: 60, right: 20, bottom: 40 },
+      xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45 } },
+      yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
+      series: [
+        { name: '现金/活期', type: 'bar', stack: 'liquid', data: data.map(d => d.cash_and_liquid), itemStyle: { color: '#409eff' } },
+        { name: '投资资产', type: 'bar', stack: 'liquid', data: data.map(d => d.investment), itemStyle: { color: '#e6a23c' } },
+        { name: '合计', type: 'line', data: data.map(d => d.cash_and_liquid + d.investment), lineStyle: { width: 2 }, itemStyle: { color: '#67c23a' } },
+      ],
+    })
+  }
 }
 
 async function editBudget() {

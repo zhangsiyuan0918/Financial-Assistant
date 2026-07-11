@@ -55,7 +55,8 @@
           </el-tag>
         </el-space>
       </template>
-      <el-table :data="backtestData" stripe size="small" max-height="300">
+      <div ref="backtestChart" style="height:280px"></div>
+      <el-table :data="backtestData" stripe size="small" max-height="300" style="margin-top:12px">
         <el-table-column prop="month" label="月份" width="100" />
         <el-table-column prop="predicted" label="预测值" width="120"><template #default="{row}">{{ fmt(row.predicted) }}</template></el-table-column>
         <el-table-column prop="actual" label="实际值" width="120"><template #default="{row}">{{ fmt(row.actual) }}</template></el-table-column>
@@ -85,6 +86,7 @@ import { createChart } from '../utils/chart.js'
 const forecastData = ref([])
 const annualTotal = ref(0)
 const forecastChart = ref(null)
+const backtestChart = ref(null)
 const backtestData = ref([])
 const mape = ref(0)
 const fmt = v => '¥' + Number(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 0 })
@@ -111,6 +113,7 @@ onMounted(async () => {
   } catch {}
 
   nextTick(() => {
+    // Forecast chart
     if (forecastChart.value) {
       createChart(forecastChart.value, {
         tooltip: { trigger: 'axis' },
@@ -123,6 +126,23 @@ onMounted(async () => {
           { name: '下限', type: 'line', data: data.data.map(d => d.lower), lineStyle: { type: 'dashed', width: 1 }, symbol: 'none', itemStyle: { color: '#b3d8ff' } },
         ],
         legend: { bottom: 0 },
+      })
+    }
+
+    // Backtest chart
+    if (backtestChart.value && backtestData.value.length) {
+      const bt = backtestData.value
+      createChart(backtestChart.value, {
+        tooltip: { trigger: 'axis' },
+        grid: { left: 80, right: 20, bottom: 40 },
+        legend: { bottom: 0 },
+        xAxis: { type: 'category', data: bt.map(d => d.month), axisLabel: { rotate: 45 } },
+        yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
+        series: [
+          { name: '预测值', type: 'bar', data: bt.map(d => d.predicted), itemStyle: { color: '#409eff' } },
+          { name: '实际值', type: 'bar', data: bt.map(d => d.actual), itemStyle: { color: '#67c23a' } },
+          { name: '误差%', type: 'line', data: bt.map(d => d.error_pct), yAxisIndex: 0, lineStyle: { type: 'dashed' }, itemStyle: { color: '#f56c6c' } },
+        ],
       })
     }
   })
