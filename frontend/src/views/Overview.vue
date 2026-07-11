@@ -324,8 +324,8 @@ function renderCharts() {
     const data = assetHistory.value
     createChart(netWorthChart.value, {
       tooltip: { trigger: 'axis' },
-      grid: { left: 60, right: 20, bottom: 60 },
-      xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45 } },
+      grid: { left: 60, right: 20, top: 20, bottom: 60 },
+      xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45, fontSize: 11 } },
       yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
       series: [{
         name: '净资产', type: 'line', data: data.map(d => d.total),
@@ -338,9 +338,9 @@ function renderCharts() {
     const data = assetHistory.value
     createChart(liquidChart.value, {
       tooltip: { trigger: 'axis' },
-      legend: { bottom: 0 },
-      grid: { left: 60, right: 20, bottom: 60 },
-      xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45 } },
+      legend: { bottom: 0, textStyle: { fontSize: 11 } },
+      grid: { left: 60, right: 20, top: 20, bottom: 80 },
+      xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45, fontSize: 11 } },
       yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
       series: [
         { name: '现金/活期', type: 'bar', stack: 'liquid', data: data.map(d => d.cash_and_liquid), itemStyle: { color: '#409eff' } },
