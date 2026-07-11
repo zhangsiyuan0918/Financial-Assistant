@@ -1183,10 +1183,16 @@ def pay_credit_card(amount, account="招行储蓄卡"):
     _save_credit_card(cc)
 
     # 同时扣减资产账户
+    balance_ok = True
     if account:
-        _update_account_balance(account, -pay_amount)
+        if not _update_account_balance(account, -pay_amount):
+            balance_ok = False
 
-    return cc
+    result = cc.copy()
+    result["balance_ok"] = balance_ok
+    if not balance_ok and account:
+        result["warning"] = f"账户「{account}」未在资产配置中找到，余额未扣减"
+    return result
 
 
 def get_credit_card_status():
@@ -1208,31 +1214,36 @@ def delete_transaction(created_at):
     row = cur.fetchone()
     if not row:
         conn.close()
-        return False
+        return {"success": False, "error": "记录不存在"}
 
     amount, tx_type, account = row
+    balance_ok = True
 
     # 反向恢复余额
     is_credit_card = account == "信用卡"
     if tx_type == "支出" and is_credit_card:
-        # 删除信用卡消费：减少待还金额
         _reverse_credit_card_expense(float(amount))
     elif tx_type == "支出" and account:
-        # 删除普通支出：加回资产
-        _update_account_balance(account, float(amount))
+        if not _update_account_balance(account, float(amount)):
+            balance_ok = False
     elif tx_type == "收入" and account:
-        # 删除收入：扣回资产
-        _update_account_balance(account, -float(amount))
+        if not _update_account_balance(account, -float(amount)):
+            balance_ok = False
 
     # 删除记录
     cur.execute("DELETE FROM manual_transactions WHERE created_at = ?", (created_at,))
     conn.commit()
     conn.close()
-    return True
+
+    result = {"success": True}
+    if not balance_ok and account:
+        result["warning"] = f"账户「{account}」未在资产配置中找到，余额未恢复"
+    return result
 
 
 def _reverse_credit_card_expense(amount):
     """反向恢复信用卡余额（删除消费时调用）"""
+    from datetime import datetime
     cc = _load_credit_card()
     cc["balance"] = round(cc["balance"] - float(amount), 2)
     cc["history"].append({
@@ -1266,15 +1277,15 @@ def add_transaction(amount, category, note="", tx_type="支出", date=None, acco
 
     # 2. 更新账户余额（信用卡消费不扣减资产，还款才扣减）
     is_credit_card = account == "信用卡"
+    balance_ok = True
     if tx_type == "支出" and is_credit_card:
-        # 信用卡消费：增加待还金额，不扣减资产
         add_credit_card_expense(amt, note)
     elif tx_type == "支出" and account:
-        # 其他账户支出：扣减资产
-        _update_account_balance(account, -amt)
+        if not _update_account_balance(account, -amt):
+            balance_ok = False
     elif tx_type == "收入" and account:
-        # 收入：增加资产
-        _update_account_balance(account, amt)
+        if not _update_account_balance(account, amt):
+            balance_ok = False
 
     tx = {
         "date": date_str,
@@ -1287,7 +1298,10 @@ def add_transaction(amount, category, note="", tx_type="支出", date=None, acco
     }
 
     # 3. 实时分析（包含更新后的净资产）
-    return _analyze_after_transaction(tx)
+    result = _analyze_after_transaction(tx)
+    if not balance_ok and account:
+        result["suggestions"].insert(0, f"⚠️ 账户「{account}」未在资产配置中找到，余额未更新")
+    return result
 
 
 def _update_account_balance(account, change):

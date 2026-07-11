@@ -1,4 +1,21 @@
 {
   "balance": 1450.9,
-  "history": []
+  "history": [
+    {
+      "date": "2026-07-11",
+      "amount": 100.0,
+      "type": "消费",
+      "note": "test CC",
+      "balance": 1550.9,
+      "created_at": "2026-07-11 19:01:42.461"
+    },
+    {
+      "date": "2026-07-11",
+      "amount": 100.0,
+      "type": "冲正",
+      "note": "删除消费记录",
+      "balance": 1450.9,
+      "created_at": "2026-07-11 19:01:42.554"
+    }
+  ]
 }
