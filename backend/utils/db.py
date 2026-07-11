@@ -46,6 +46,19 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_trans_month ON transactions("month");
         CREATE INDEX IF NOT EXISTS idx_trans_cat ON transactions("category_l1");
         CREATE INDEX IF NOT EXISTS idx_trans_clean_date ON transactions("clean_date");
+
+        CREATE TABLE IF NOT EXISTS manual_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            amount REAL NOT NULL,
+            category TEXT NOT NULL,
+            type TEXT NOT NULL DEFAULT '支出',
+            account TEXT DEFAULT '',
+            note TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_manual_date ON manual_transactions("date");
+        CREATE INDEX IF NOT EXISTS idx_manual_month ON manual_transactions(date);
     """)
     conn.commit()
     conn.close()

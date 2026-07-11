@@ -1108,30 +1108,40 @@ TRANSACTION_FIELDS = ["date", "amount", "category", "type", "account", "note", "
 DEFAULT_ACCOUNTS = ["招行储蓄卡", "微信零钱", "现金", "信用卡"]
 
 
+def _get_manual_conn():
+    """获取 SQLite 连接（manual_transactions 表）"""
+    from utils import db
+    db.init_db()
+    return db.get_conn()
+
+
 def _load_transactions():
-    if not os.path.exists(TRANSACTIONS_FILE):
+    """从 SQLite 加载手动记账记录"""
+    try:
+        conn = _get_manual_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT date, amount, category, type, account, note, created_at FROM manual_transactions ORDER BY created_at DESC")
+        rows = [{"date": r[0], "amount": str(r[1]), "category": r[2], "type": r[3], "account": r[4], "note": r[5], "created_at": r[6]} for r in cur.fetchall()]
+        conn.close()
+        return rows
+    except Exception:
         return []
-    with open(TRANSACTIONS_FILE, "r", encoding="utf-8-sig") as f:
-        return list(csv.DictReader(f))
 
 
 def _save_transactions(rows):
-    os.makedirs(os.path.dirname(TRANSACTIONS_FILE), exist_ok=True)
-    with open(TRANSACTIONS_FILE, "w", encoding="utf-8-sig", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=TRANSACTION_FIELDS)
-        writer.writeheader()
-        writer.writerows(rows)
+    """兼容旧逻辑（不再使用）"""
+    pass
 
 
 def delete_transaction(created_at):
     """删除指定 created_at 的交易记录"""
-    transactions = _load_transactions()
-    original_len = len(transactions)
-    transactions = [t for t in transactions if t.get("created_at") != created_at]
-    if len(transactions) < original_len:
-        _save_transactions(transactions)
-        return True
-    return False
+    conn = _get_manual_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM manual_transactions WHERE created_at = ?", (created_at,))
+    deleted = cur.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
 
 
 def add_transaction(amount, category, note="", tx_type="支出", date=None, account=""):
@@ -1139,7 +1149,16 @@ def add_transaction(amount, category, note="", tx_type="支出", date=None, acco
     from datetime import datetime
     now = datetime.now()
     date_str = date or now.strftime("%Y-%m-%d")
-    month_str = date_str[:7]
+    created_at = now.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+    conn = _get_manual_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO manual_transactions (date, amount, category, type, account, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (date_str, round(float(amount), 2), category, tx_type, account, note, created_at)
+    )
+    conn.commit()
+    conn.close()
 
     tx = {
         "date": date_str,
@@ -1148,12 +1167,8 @@ def add_transaction(amount, category, note="", tx_type="支出", date=None, acco
         "type": tx_type,
         "account": account,
         "note": note,
-        "created_at": now.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+        "created_at": created_at,
     }
-
-    transactions = _load_transactions()
-    transactions.append(tx)
-    _save_transactions(transactions)
 
     # 实时分析
     return _analyze_after_transaction(tx)
