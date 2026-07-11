@@ -122,16 +122,24 @@ onUnmounted(() => {
 
 <style>
 body { margin: 0; font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-.el-card { margin-bottom: 16px; border-radius: 8px; }
+.el-card { margin-bottom: 8px; border-radius: 8px; }
 
 /* Sidebar */
+.el-aside {
+  display: flex;
+  flex-direction: column;
+}
 .sidebar-logo {
-  padding: 20px;
+  padding: 16px;
   color: #fff;
   text-align: center;
   border-bottom: 1px solid rgba(255,255,255,.1);
 }
-.sidebar-menu { border-right: none !important; }
+.sidebar-menu {
+  border-right: none !important;
+  flex: 1;
+  overflow-y: auto;
+}
 
 /* Alert badge in sidebar */
 .alert-badge { margin-left: 8px; }

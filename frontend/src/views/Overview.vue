@@ -37,11 +37,11 @@
     </el-row>
 
     <!-- Charts + Alert summary in one row -->
-    <el-row :gutter="12" style="margin-top:0">
+    <el-row :gutter="8" style="margin-top:4px">
       <el-col :xs="24" :sm="14">
         <el-card>
           <template #header><span style="font-size:14px">资产分层</span></template>
-          <div ref="layerChart" style="height:280px"></div>
+          <div ref="layerChart" style="height:240px"></div>
         </el-card>
       </el-col>
       <el-col :xs="24" :sm="10">
@@ -75,13 +75,13 @@
     </el-row>
 
     <!-- Net worth trend -->
-    <el-card style="margin-top:0">
+    <el-card style="margin-top:4px">
       <template #header><span style="font-size:14px">净资产走势</span></template>
-      <div ref="netWorthChart" style="height:220px"></div>
+      <div ref="netWorthChart" style="height:180px"></div>
     </el-card>
 
     <!-- Asset detail + Budget in one row -->
-    <el-row :gutter="12" style="margin-top:0">
+    <el-row :gutter="8" style="margin-top:4px">
       <el-col :xs="24" :sm="14">
         <el-card>
           <template #header>
@@ -120,7 +120,7 @@
     </el-row>
 
     <!-- Data management -->
-    <el-card style="margin-top:0">
+    <el-card style="margin-top:4px">
       <template #header><span style="font-size:14px">数据管理</span></template>
       <el-space wrap>
         <el-button size="small" type="primary" plain @click="uploadVisible = true">导入 CSV</el-button>
