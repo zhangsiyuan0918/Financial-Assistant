@@ -1178,27 +1178,34 @@ def _analyze_after_transaction(tx):
     """记账后实时分析"""
     from datetime import datetime
     now = datetime.now()
-    month_str = tx["date"][:7]  # 使用交易日期所在月份
+    month_str = tx["date"][:7]
 
     transactions = _load_transactions()
     month_txs = [t for t in transactions if t["date"][:7] == month_str]
 
-    # 当月分类汇总
-    category_totals = {}
-    month_total = 0
+    # 区分支出和收入
+    expense_totals = {}
+    income_totals = {}
+    total_expense = 0
+    total_income = 0
+
     for t in month_txs:
         cat = t["category"]
         amt = float(t["amount"])
-        category_totals[cat] = category_totals.get(cat, 0) + amt
-        month_total += amt
+        if t["type"] == "收入":
+            income_totals[cat] = income_totals.get(cat, 0) + amt
+            total_income += amt
+        else:
+            expense_totals[cat] = expense_totals.get(cat, 0) + amt
+            total_expense += amt
 
-    # 预算对比
+    # 预算对比（仅支出）
     budget_config = _load_budget_config()
     budget_status = []
     for cat, budget in budget_config.items():
         if budget <= 0:
             continue
-        spent = category_totals.get(cat, 0)
+        spent = expense_totals.get(cat, 0)
         ratio = round(spent / budget * 100, 1) if budget else 0
         budget_status.append({
             "category": cat,
@@ -1209,13 +1216,19 @@ def _analyze_after_transaction(tx):
             "status": "超支" if ratio > 100 else ("偏高" if ratio > 80 else "正常"),
         })
 
-    # 总预算
+    # 总预算（仅支出）
     total_budget = sum(b for b in budget_config.values() if b > 0)
-    total_spent = month_total
+    total_spent = total_expense
     total_remaining = max(total_budget - total_spent, 0)
 
     # AI 分析建议
     suggestions = []
+
+    # 收入提示
+    if total_income > 0:
+        suggestions.append(f"💰 本月已记录收入 ¥{total_income:,.0f}")
+
+    # 预算建议（仅支出）
     over_budget = [b for b in budget_status if b["ratio"] > 100]
     warn_budget = [b for b in budget_status if 80 <= b["ratio"] <= 100]
 
@@ -1226,27 +1239,39 @@ def _analyze_after_transaction(tx):
         for b in warn_budget:
             suggestions.append(f"⚡ {b['category']}接近上限{b['ratio']:.0f}%，剩余¥{b['remaining']:,.0f}")
 
-    # 与上月同期对比
+    # 结余提示
+    balance = total_income - total_expense
+    if total_income > 0:
+        if balance >= 0:
+            suggestions.append(f"✅ 本月结余 ¥{balance:,.0f}（收入 ¥{total_income:,.0f} - 支出 ¥{total_expense:,.0f}）")
+        else:
+            suggestions.append(f"🔴 本月超支 ¥{abs(balance):,.0f}（收入 ¥{total_income:,.0f} - 支出 ¥{total_expense:,.0f}）")
+
+    # 与上月同期对比（仅支出）
     prev_month = f"{now.year}-{now.month-1:02d}" if now.month > 1 else f"{now.year-1}-12"
-    prev_txs = [t for t in transactions if t["date"][:7] == prev_month]
+    prev_txs = [t for t in transactions if t["date"][:7] == prev_month and t["type"] != "收入"]
     prev_total = sum(float(t["amount"]) for t in prev_txs)
     if prev_total > 0:
-        change = round((month_total - prev_total) / prev_total * 100, 1)
+        change = round((total_expense - prev_total) / prev_total * 100, 1)
         if change > 20:
             suggestions.append(f"📈 本月支出比上月同期增长{change}%，注意控制")
         elif change < -20:
             suggestions.append(f"📉 本月支出比上月同期减少{abs(change)}%，继续保持")
 
-    # 最近5笔
-    recent_5 = [{"date": t["date"], "amount": float(t["amount"]), "category": t["category"], "note": t["note"]} for t in month_txs[-5:]]
+    # 最近5笔（支出）
+    recent_expense = [t for t in month_txs if t["type"] != "收入"]
+    recent_5 = [{"date": t["date"], "amount": float(t["amount"]), "category": t["category"], "note": t["note"], "type": t["type"]} for t in recent_expense[-5:]]
 
     return {
         "recorded": tx,
         "month_summary": {
             "month": month_str,
-            "total": round(month_total, 2),
+            "total_expense": round(total_expense, 2),
+            "total_income": round(total_income, 2),
+            "balance": round(balance, 2),
             "count": len(month_txs),
-            "by_category": {k: round(v, 2) for k, v in sorted(category_totals.items(), key=lambda x: -x[1])},
+            "expense_by_category": {k: round(v, 2) for k, v in sorted(expense_totals.items(), key=lambda x: -x[1])},
+            "income_by_category": {k: round(v, 2) for k, v in sorted(income_totals.items(), key=lambda x: -x[1])},
         },
         "budget": {
             "total_budget": total_budget,
