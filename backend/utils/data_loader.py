@@ -1832,6 +1832,7 @@ def get_spending_habits():
 
 def _generate_ai_insights(habits, expense, current_month):
     """用 LLM 生成个性化消费洞察"""
+    import re
     from utils import llm
 
     if not llm.is_configured():
