@@ -36,12 +36,14 @@
     <!-- 第二行：按钮 -->
     <div style="margin-top:8px;padding:8px;background:#f0f9eb;border:1px dashed #67c23a">
       <div style="font-size:11px;color:#999;margin-bottom:4px">调试区域</div>
-      <el-button type="primary" size="small" @click="submit" :loading="loading" :disabled="!form.amount || !form.category">
+      <button @click="submit" :disabled="!form.amount || !form.category"
+        style="padding:6px 16px;background:#409eff;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-right:8px">
         记账
-      </el-button>
-      <el-button size="small" @click="showHistory = !showHistory">
+      </button>
+      <button @click="showHistory = !showHistory"
+        style="padding:6px 16px;background:#fff;color:#333;border:1px solid #dcdfe6;border-radius:4px;cursor:pointer">
         {{ showHistory ? '收起历史' : '查看历史记录' }}
-      </el-button>
+      </button>
     </div>
 
     <!-- 分析结果 -->
