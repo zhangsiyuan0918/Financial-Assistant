@@ -87,8 +87,9 @@
             <span style="font-size:13px">{{ tx.category }}</span>
             <span v-if="tx.note" style="font-size:12px;color:#999;margin-left:6px">{{ tx.note }}</span>
           </div>
-          <span style="font-size:12px;color:#999;margin-right:12px">{{ tx.date }}</span>
-          <span style="font-size:13px;color:#f56c6c;font-weight:500">-¥{{ Number(tx.amount).toLocaleString() }}</span>
+          <span style="font-size:12px;color:#999;margin-right:8px">{{ tx.date }}</span>
+          <span style="font-size:13px;color:#f56c6c;font-weight:500;margin-right:8px">-¥{{ Number(tx.amount).toLocaleString() }}</span>
+          <el-button size="small" type="danger" text @click="deleteTx(tx)">删除</el-button>
         </div>
       </div>
     </div>
@@ -166,6 +167,16 @@ async function loadHistory() {
     historyList.value = []
   } finally {
     historyLoading.value = false
+  }
+}
+
+async function deleteTx(tx) {
+  try {
+    await fetch(`/api/transaction/${encodeURIComponent(tx.created_at)}`, { method: 'DELETE' })
+    ElMessage.success('已删除')
+    loadHistory()
+  } catch (e) {
+    ElMessage.error('删除失败')
   }
 }
 

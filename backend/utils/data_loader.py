@@ -1120,6 +1120,17 @@ def _save_transactions(rows):
         writer.writerows(rows)
 
 
+def delete_transaction(created_at):
+    """删除指定 created_at 的交易记录"""
+    transactions = _load_transactions()
+    original_len = len(transactions)
+    transactions = [t for t in transactions if t.get("created_at") != created_at]
+    if len(transactions) < original_len:
+        _save_transactions(transactions)
+        return True
+    return False
+
+
 def add_transaction(amount, category, note="", tx_type="支出", date=None):
     """记一笔账并返回实时分析"""
     from datetime import datetime

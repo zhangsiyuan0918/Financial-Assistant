@@ -9,7 +9,7 @@ from auth import login, check_token, require_auth
 from utils import db, llm
 db.set_db_path(DB_PATH)
 from utils.query_engine import QueryEngine
-from utils.data_loader import get_overview, get_spending, get_monthly_trend, get_category_detail, get_income_analysis, get_asset_history, get_portfolio, get_seasonal_patterns, get_budget_status, get_monthly_report, update_assets, update_budget, get_alerts, resolve_alert, get_goals, create_goal, update_goal, delete_goal, get_financial_health, get_comparison, get_annual_report, add_transaction, get_quick_stats
+from utils.data_loader import get_overview, get_spending, get_monthly_trend, get_category_detail, get_income_analysis, get_asset_history, get_portfolio, get_seasonal_patterns, get_budget_status, get_monthly_report, update_assets, update_budget, get_alerts, resolve_alert, get_goals, create_goal, update_goal, delete_goal, get_financial_health, get_comparison, get_annual_report, add_transaction, delete_transaction, get_quick_stats
 from utils.pipeline import run_full_pipeline, run_forecast_only
 
 app = Flask(__name__, static_folder=None)
@@ -134,9 +134,17 @@ def api_list_transactions():
     txs = _load_transactions()
     if month:
         txs = [t for t in txs if t["date"][:7] == month]
-    # 按日期倒序
+    # 按日期倒序，附带原始索引
     txs.sort(key=lambda t: t["date"], reverse=True)
     return jsonify(txs)
+
+
+@app.route("/api/transaction/<created_at>", methods=["DELETE"])
+def api_delete_transaction(created_at):
+    removed = delete_transaction(created_at)
+    if removed:
+        return jsonify({"status": "ok"})
+    return jsonify({"error": "记录不存在"}), 404
 
 
 @app.route("/api/health")
