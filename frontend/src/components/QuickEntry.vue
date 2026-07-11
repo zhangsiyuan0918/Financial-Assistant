@@ -206,6 +206,7 @@ onMounted(async () => {
 
 <style scoped>
 .quick-entry { margin-bottom: 12px; }
+.quick-entry :deep(.el-card__header) { overflow: visible; }
 .analysis-result { font-size: 13px; }
 .analysis-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .suggestions { margin-bottom: 8px; }
