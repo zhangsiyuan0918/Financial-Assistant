@@ -14,10 +14,16 @@
           <el-input v-model="form.model" placeholder="deepseek-v4-flash" />
         </el-form-item>
         <el-form-item>
-          <el-space>
-            <el-button type="primary" @click="save" :loading="saving">保存</el-button>
-            <el-button @click="test" :loading="testing">测试连接</el-button>
-          </el-space>
+          <div style="display:flex;gap:8px">
+            <button @click="save" :disabled="saving"
+              style="padding:8px 20px;background:#409eff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">
+              {{ saving ? '保存中...' : '保存' }}
+            </button>
+            <button @click="test" :disabled="testing"
+              style="padding:8px 16px;background:#fff;color:#606266;border:1px solid #dcdfe6;border-radius:4px;cursor:pointer;font-size:13px">
+              {{ testing ? '测试中...' : '测试连接' }}
+            </button>
+          </div>
         </el-form-item>
         <el-form-item v-if="testResult">
           <el-alert :type="testResult.success ? 'success' : 'error'" show-icon :closable="false"
