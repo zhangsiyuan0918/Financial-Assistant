@@ -8,6 +8,29 @@ from config import V4_FILE, DB_PATH, ASSET_LAYERS, CASH_LIQUID, INVESTMENT, REST
 from utils import db
 db.set_db_path(DB_PATH)
 
+import threading
+
+# 文件锁：每种 JSON 文件一把锁
+_file_locks = {
+    "asset": threading.Lock(),
+    "credit_card": threading.Lock(),
+    "budget": threading.Lock(),
+    "goals": threading.Lock(),
+    "alerts": threading.Lock(),
+}
+
+
+def _atomic_write(filepath, data):
+    """原子写入：先写临时文件，再重命名，防止写入中途崩溃导致文件损坏"""
+    tmp = filepath + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    # Windows 上 rename 需要先删除目标文件
+    if os.path.exists(filepath):
+        os.replace(tmp, filepath)
+    else:
+        os.rename(tmp, filepath)
+
 
 def _load_asset_config():
     """从 JSON 加载资产配置，不存在则使用 config.py 默认值"""
@@ -18,8 +41,8 @@ def _load_asset_config():
 
 
 def _save_asset_config(data):
-    with open(ASSET_CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    with _file_locks["asset"]:
+        _atomic_write(ASSET_CONFIG_FILE, data)
 
 
 def _layers_from_config(config):
@@ -451,8 +474,8 @@ def _load_budget_config():
 
 
 def _save_budget_config(data):
-    with open(BUDGET_CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    with _file_locks["budget"]:
+        _atomic_write(BUDGET_CONFIG_FILE, data)
 
 
 def get_budget_status(month=None):
@@ -820,8 +843,8 @@ def _load_alerts():
 
 
 def _save_alerts(data):
-    with open(ALERTS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    with _file_locks["alerts"]:
+        _atomic_write(ALERTS_FILE, data)
 
 
 def get_alerts():
@@ -926,8 +949,8 @@ def _load_goals():
 
 
 def _save_goals(data):
-    with open(GOALS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    with _file_locks["goals"]:
+        _atomic_write(GOALS_FILE, data)
 
 
 def get_goals():
@@ -1144,9 +1167,8 @@ def _load_credit_card():
 
 
 def _save_credit_card(data):
-    os.makedirs(os.path.dirname(CREDIT_CARD_FILE), exist_ok=True)
-    with open(CREDIT_CARD_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    with _file_locks["credit_card"]:
+        _atomic_write(CREDIT_CARD_FILE, data)
 
 
 def add_credit_card_expense(amount, note=""):
