@@ -13,6 +13,12 @@
     </template>
 
     <el-form :model="form" inline size="default">
+      <el-form-item>
+        <el-radio-group v-model="form.type" size="small" @change="form.category = ''">
+          <el-radio-button value="支出">支出</el-radio-button>
+          <el-radio-button value="收入">收入</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
       <el-form-item label="日期">
         <el-date-picker v-model="form.date" type="date" value-format="YYYY-MM-DD" style="width:120px" :shortcuts="dateShortcuts" />
       </el-form-item>
@@ -20,8 +26,8 @@
         <el-input-number v-model="form.amount" :min="0.01" :step="10" :precision="2" style="width:110px" placeholder="0.00" />
       </el-form-item>
       <el-form-item label="分类">
-        <el-select v-model="form.category" style="width:90px" placeholder="分类">
-          <el-option v-for="cat in categories" :key="cat" :label="cat" :value="cat" />
+        <el-select v-model="form.category" style="width:100px" placeholder="分类">
+          <el-option v-for="cat in currentCategories" :key="cat" :label="cat" :value="cat" />
         </el-select>
       </el-form-item>
       <el-form-item label="账户">
@@ -33,7 +39,8 @@
         <el-input v-model="form.note" style="width:100px" placeholder="可选" clearable />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" @click="submit" :loading="loading" :disabled="!form.amount || !form.category">
+        <el-button type="primary" @click="submit" :loading="loading" :disabled="!form.amount || !form.category"
+          :style="{ background: form.type === '收入' ? '#67c23a' : '' }">
           记账
         </el-button>
       </el-form-item>
@@ -102,13 +109,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { fetchTransactions } from '../api/index.js'
 
 const emit = defineEmits(['recorded'])
 
 const categories = ['餐饮', '交通', '购物', '居住', '娱乐', '社交', '旅游', '车辆', '医疗', '个护', '学习', '数字消费', '其他']
+const incomeCategories = ['工资', '奖金', '理财收益', '兼职', '退款', '红包', '其他收入']
+const currentCategories = computed(() => form.value.type === '收入' ? incomeCategories : categories)
 
 function today() { return new Date().toISOString().slice(0, 10) }
 function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
