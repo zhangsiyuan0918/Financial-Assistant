@@ -1,5 +1,5 @@
 <template>
-  <el-card class="quick-entry">
+  <el-card class="finflow-quick-entry">
     <template #header>
       <span style="font-size:14px;font-weight:bold">记一笔</span>
     </template>
@@ -206,17 +206,17 @@ onMounted(async () => {
 })
 </script>
 
-<!-- 注意：不能使用 scoped，会导致 Element Plus 组件渲染异常 -->
+<!-- 使用唯一前缀避免全局样式冲突 -->
 <style>
-.quick-entry { margin-bottom: 12px; }
-.quick-entry .el-card__header { overflow: visible; }
-.analysis-result { font-size: 13px; }
-.analysis-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
-.suggestions { margin-bottom: 8px; }
-.budget-bar { margin-bottom: 8px; }
-.category-list { margin-bottom: 8px; }
-.category-item { display: flex; align-items: center; padding: 2px 0; }
-.history-list { max-height: 300px; overflow-y: auto; }
-.history-item { display: flex; align-items: center; padding: 6px 0; border-bottom: 1px solid #f5f5f5; }
-.history-item:last-child { border-bottom: none; }
+.finflow-quick-entry { margin-bottom: 12px; }
+.finflow-quick-entry .el-card__header { overflow: visible; }
+.finflow-quick-entry .analysis-result { font-size: 13px; }
+.finflow-quick-entry .analysis-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.finflow-quick-entry .suggestions { margin-bottom: 8px; }
+.finflow-quick-entry .budget-bar { margin-bottom: 8px; }
+.finflow-quick-entry .category-list { margin-bottom: 8px; }
+.finflow-quick-entry .category-item { display: flex; align-items: center; padding: 2px 0; }
+.finflow-quick-entry .history-list { max-height: 300px; overflow-y: auto; }
+.finflow-quick-entry .history-item { display: flex; align-items: center; padding: 6px 0; border-bottom: 1px solid #f5f5f5; }
+.finflow-quick-entry .history-item:last-child { border-bottom: none; }
 </style>
