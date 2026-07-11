@@ -1150,19 +1150,26 @@ def add_transaction(amount, category, note="", tx_type="支出", date=None, acco
     now = datetime.now()
     date_str = date or now.strftime("%Y-%m-%d")
     created_at = now.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    amt = round(float(amount), 2)
 
+    # 1. 写入流水
     conn = _get_manual_conn()
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO manual_transactions (date, amount, category, type, account, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (date_str, round(float(amount), 2), category, tx_type, account, note, created_at)
+        (date_str, amt, category, tx_type, account, note, created_at)
     )
     conn.commit()
     conn.close()
 
+    # 2. 更新账户余额
+    balance_change = -amt if tx_type == "支出" else amt
+    if account:
+        _update_account_balance(account, balance_change)
+
     tx = {
         "date": date_str,
-        "amount": str(round(float(amount), 2)),
+        "amount": str(amt),
         "category": category,
         "type": tx_type,
         "account": account,
@@ -1170,8 +1177,19 @@ def add_transaction(amount, category, note="", tx_type="支出", date=None, acco
         "created_at": created_at,
     }
 
-    # 实时分析
+    # 3. 实时分析（包含更新后的净资产）
     return _analyze_after_transaction(tx)
+
+
+def _update_account_balance(account, change):
+    """更新指定账户的余额"""
+    asset_config = _load_asset_config()
+    for layer_name, items in asset_config.items():
+        if account in items:
+            items[account] = round(items[account] + change, 2)
+            _save_asset_config(asset_config)
+            return True
+    return False
 
 
 def _analyze_after_transaction(tx):
@@ -1282,6 +1300,7 @@ def _analyze_after_transaction(tx):
         },
         "suggestions": suggestions,
         "recent_5": recent_5,
+        "overview": get_overview(),
     }
 
 
