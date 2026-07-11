@@ -68,6 +68,7 @@ def _deduplicate(df):
 
 
 def load_v4(force_csv=False):
+    """加载 CSV 历史数据"""
     if not force_csv and db.is_migrated():
         conn = db.get_conn()
         df = pd.read_sql("SELECT * FROM transactions", conn)
@@ -91,6 +92,47 @@ def load_v4(force_csv=False):
     df, removed = _deduplicate(df)
     if removed > 0:
         print(f"[data_loader] Deduplicated: removed {removed} duplicate rows")
+    return df
+
+
+def load_manual_transactions_df():
+    """将手动记账数据转为 DataFrame，字段映射到与 CSV 一致"""
+    txs = _load_transactions()
+    if not txs:
+        return pd.DataFrame()
+
+    rows = []
+    for t in txs:
+        rows.append({
+            "cny_amount": float(t.get("amount", 0)),
+            "clean_date": pd.to_datetime(t.get("date"), errors="coerce"),
+            "corrected_type": t.get("type", "支出"),
+            "category_l1": t.get("category", ""),
+            "month": pd.to_datetime(t.get("date"), errors="coerce").strftime("%Y-%m") if t.get("date") else "",
+            "valid_for_stats": "True",
+            "is_outlier": "False",
+            "source": "manual",
+        })
+    df = pd.DataFrame(rows)
+    return df
+
+
+def load_unified():
+    """加载统一数据：CSV 历史 + 手动记账，合并为一个 DataFrame"""
+    df_csv = load_v4()
+    df_manual = load_manual_transactions_df()
+
+    if df_manual.empty:
+        return df_csv
+
+    # 确保列一致
+    for col in df_csv.columns:
+        if col not in df_manual.columns:
+            df_manual[col] = ""
+
+    # 合并
+    df = pd.concat([df_csv, df_manual[df_csv.columns]], ignore_index=True)
+    df["month"] = df["clean_date"].dt.to_period("M").astype(str)
     return df
 
 
@@ -183,7 +225,7 @@ def get_overview():
 
 
 def get_spending(year=None):
-    df = load_v4()
+    df = load_unified()
     valid = df[df["valid_for_stats"] == "True"]
     expense = valid[valid["corrected_type"] == "支出"]
     if year and year != "all":
@@ -201,7 +243,7 @@ def get_spending(year=None):
 
 
 def get_monthly_trend():
-    df = load_v4()
+    df = load_unified()
     valid = df[df["valid_for_stats"] == "True"]
     expense = valid[valid["corrected_type"] == "支出"]
     income = valid[valid["corrected_type"] == "收入"]
@@ -439,7 +481,7 @@ def update_budget(new_budget):
 
 def get_seasonal_patterns():
     """分析季节性支出模式"""
-    df = load_v4()
+    df = load_unified()
     valid = df[df["valid_for_stats"] == "True"]
     expense = valid[valid["corrected_type"] == "支出"]
     norm = expense[expense["is_outlier"] != "True"].copy()
@@ -492,7 +534,7 @@ def _save_budget_config(data):
 
 def get_budget_status(month=None):
     """当月预算执行情况"""
-    df = load_v4()
+    df = load_unified()
     valid = df[df["valid_for_stats"] == "True"]
     expense = valid[valid["corrected_type"] == "支出"]
     norm = expense[expense["is_outlier"] != "True"]
@@ -1804,7 +1846,7 @@ def get_spending_habits():
     now = datetime.now()
     current_month = now.strftime("%Y-%m")
 
-    df = load_v4()
+    df = load_unified()
     valid = df[df["valid_for_stats"] == "True"]
     expense = valid[valid["corrected_type"] == "支出"]
 
