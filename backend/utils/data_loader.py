@@ -4,7 +4,7 @@ import os
 import pandas as pd
 from collections import defaultdict
 import sys, os; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import V4_FILE, DB_PATH, ASSET_LAYERS, CASH_LIQUID, INVESTMENT, RESTRICTED, RECEIVABLES, DEBT, BILLS_PAYABLE, ASSET_HISTORY_FILE, ASSET_CONFIG_FILE, BUDGET_CONFIG_FILE, MONTHLY_SALARY, QUARTERLY_BONUS, PORTFOLIO, MONTHLY_BUDGET, ALERTS_FILE, GOALS_FILE, FORECAST_FILE
+from config import V4_FILE, DB_PATH, ASSET_LAYERS, CASH_LIQUID, INVESTMENT, RESTRICTED, RECEIVABLES, DEBT, BILLS_PAYABLE, ASSET_HISTORY_FILE, ASSET_CONFIG_FILE, BUDGET_CONFIG_FILE, MONTHLY_SALARY, QUARTERLY_BONUS, PORTFOLIO, MONTHLY_BUDGET, ALERTS_FILE, GOALS_FILE, FORECAST_FILE, CREDIT_CARD_FILE
 from utils import db
 db.set_db_path(DB_PATH)
 
@@ -1133,6 +1133,71 @@ def _save_transactions(rows):
     pass
 
 
+# ===================== 信用卡管理 =====================
+
+def _load_credit_card():
+    """加载信用卡账单"""
+    if os.path.exists(CREDIT_CARD_FILE):
+        with open(CREDIT_CARD_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"balance": 0, "history": []}
+
+
+def _save_credit_card(data):
+    os.makedirs(os.path.dirname(CREDIT_CARD_FILE), exist_ok=True)
+    with open(CREDIT_CARD_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def add_credit_card_expense(amount, note=""):
+    """信用卡消费：不扣减资产，增加待还金额"""
+    from datetime import datetime
+    cc = _load_credit_card()
+    cc["balance"] = round(cc["balance"] + float(amount), 2)
+    cc["history"].append({
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "amount": round(float(amount), 2),
+        "type": "消费",
+        "note": note,
+        "balance": cc["balance"],
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+    })
+    _save_credit_card(cc)
+    return cc
+
+
+def pay_credit_card(amount, account="招行储蓄卡"):
+    """信用卡还款：扣减资产，减少待还金额"""
+    from datetime import datetime
+    cc = _load_credit_card()
+    pay_amount = min(float(amount), cc["balance"])
+    cc["balance"] = round(cc["balance"] - pay_amount, 2)
+    cc["history"].append({
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "amount": round(pay_amount, 2),
+        "type": "还款",
+        "note": f"还款（{account}）",
+        "balance": cc["balance"],
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+    })
+    _save_credit_card(cc)
+
+    # 同时扣减资产账户
+    if account:
+        _update_account_balance(account, -pay_amount)
+
+    return cc
+
+
+def get_credit_card_status():
+    """获取信用卡状态"""
+    cc = _load_credit_card()
+    return {
+        "balance": cc["balance"],
+        "history": cc["history"][-10:],  # 最近10条
+    }
+
+
 def delete_transaction(created_at):
     """删除指定 created_at 的交易记录，并反向恢复账户余额"""
     conn = _get_manual_conn()
@@ -1178,10 +1243,17 @@ def add_transaction(amount, category, note="", tx_type="支出", date=None, acco
     conn.commit()
     conn.close()
 
-    # 2. 更新账户余额
-    balance_change = -amt if tx_type == "支出" else amt
-    if account:
-        _update_account_balance(account, balance_change)
+    # 2. 更新账户余额（信用卡消费不扣减资产，还款才扣减）
+    is_credit_card = account == "信用卡"
+    if tx_type == "支出" and is_credit_card:
+        # 信用卡消费：增加待还金额，不扣减资产
+        add_credit_card_expense(amt, note)
+    elif tx_type == "支出" and account:
+        # 其他账户支出：扣减资产
+        _update_account_balance(account, -amt)
+    elif tx_type == "收入" and account:
+        # 收入：增加资产
+        _update_account_balance(account, amt)
 
     tx = {
         "date": date_str,
