@@ -202,8 +202,21 @@ def api_current_analysis():
     suggestions = []
     if total_income > 0:
         suggestions.append(f"💰 本月已记录收入 ¥{total_income:,.0f}")
+
+    # 预算超支建议
+    over_budget = [b for b in budget_status if b["ratio"] > 100]
+    warn_budget = [b for b in budget_status if 80 <= b["ratio"] <= 100]
+    if over_budget:
+        for b in over_budget:
+            over_amount = b["spent"] - b["budget"]
+            suggestions.append(f"⚠️ {b['category']}已超支{b['ratio']:.0f}%（¥{b['spent']:,.0f}/¥{b['budget']:,.0f}），超支¥{over_amount:,.0f}")
+    if warn_budget:
+        for b in warn_budget:
+            suggestions.append(f"⚡ {b['category']}接近上限{b['ratio']:.0f}%，剩余¥{b['remaining']:,.0f}")
+
     if balance >= 0 and total_income > 0:
-        suggestions.append(f"✅ 本月结余 ¥{balance:,.0f}")
+        savings_rate = round(balance / total_income * 100, 1)
+        suggestions.append(f"✅ 本月结余 ¥{balance:,.0f}（储蓄率 {savings_rate}%）")
     elif balance < 0 and total_income > 0:
         suggestions.append(f"🔴 本月超支 ¥{abs(balance):,.0f}")
 

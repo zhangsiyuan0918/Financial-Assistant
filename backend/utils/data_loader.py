@@ -1444,18 +1444,58 @@ def _analyze_after_transaction(tx):
 
     if over_budget:
         for b in over_budget:
-            suggestions.append(f"⚠️ {b['category']}已超支{b['ratio']:.0f}%（¥{b['spent']:,.0f}/¥{b['budget']:,.0f}），建议控制")
+            over_amount = b["spent"] - b["budget"]
+            suggestions.append(f"⚠️ {b['category']}已超支{b['ratio']:.0f}%（¥{b['spent']:,.0f}/¥{b['budget']:,.0f}），超支¥{over_amount:,.0f}")
+            # 给出具体省钱建议
+            if b["category"] == "餐饮":
+                suggestions.append(f"   💡 建议：减少外卖频率，每天自己做饭可省约¥{over_amount/30:,.0f}/天")
+            elif b["category"] == "购物":
+                suggestions.append(f"   💡 建议：设置48小时冷静期，非必需品延后购买")
+            elif b["category"] == "娱乐":
+                suggestions.append(f"   💡 建议：寻找免费替代活动（公园散步、免费展览等）")
+            elif b["category"] == "交通":
+                suggestions.append(f"   💡 建议：短途出行选择地铁/公交代替打车")
+            elif b["category"] == "社交":
+                suggestions.append(f"   💡 建议：下次聚餐选择AA制或人均更低的场所")
     if warn_budget:
         for b in warn_budget:
-            suggestions.append(f"⚡ {b['category']}接近上限{b['ratio']:.0f}%，剩余¥{b['remaining']:,.0f}")
+            suggestions.append(f"⚡ {b['category']}接近上限{b['ratio']:.0f}%，剩余¥{b['remaining']:,.0f}，本月剩余天数需控制在¥{b['remaining']/max(1,30-now.day):,.0f}/天")
 
     # 结余提示
     balance = total_income - total_expense
     if total_income > 0:
         if balance >= 0:
-            suggestions.append(f"✅ 本月结余 ¥{balance:,.0f}（收入 ¥{total_income:,.0f} - 支出 ¥{total_expense:,.0f}）")
+            savings_rate = round(balance / total_income * 100, 1)
+            suggestions.append(f"✅ 本月结余 ¥{balance:,.0f}（储蓄率 {savings_rate}%）")
         else:
             suggestions.append(f"🔴 本月超支 ¥{abs(balance):,.0f}（收入 ¥{total_income:,.0f} - 支出 ¥{total_expense:,.0f}）")
+            # 如果有收入，给出控制建议
+            if total_income > 0:
+                target_expense = total_income * 0.8  # 建议支出不超过收入的80%
+                reduce_needed = total_expense - target_expense
+                if reduce_needed > 0:
+                    suggestions.append(f"   💡 建议：将月支出控制在¥{target_expense:,.0f}以内（收入的80%），需减少¥{reduce_needed:,.0f}")
+
+    # 消费习惯分析（基于历史数据）
+    try:
+        df = load_v4()
+        valid = df[df["valid_for_stats"] == "True"]
+        expense = valid[valid["corrected_type"] == "支出"]
+        current_month = tx["date"][:7]
+        current_expense = expense[expense["month"] == current_month]
+        prev_expense = expense[expense["month"] == prev_month] if prev_month else pd.DataFrame()
+
+        if not current_expense.empty and not prev_expense.empty:
+            # 找出增长最快的分类
+            cur_cats = current_expense.groupby("category_l1")["cny_amount"].sum()
+            prev_cats = prev_expense.groupby("category_l1")["cny_amount"].sum()
+            for cat in cur_cats.index:
+                if cat in prev_cats.index and prev_cats[cat] > 0:
+                    growth = (cur_cats[cat] - prev_cats[cat]) / prev_cats[cat] * 100
+                    if growth > 30:
+                        suggestions.append(f"📈 {cat}支出比上月增长{growth:.0f}%，建议关注")
+    except Exception:
+        pass
 
     # 与上月同期对比（仅支出）
     prev_month = f"{now.year}-{now.month-1:02d}" if now.month > 1 else f"{now.year-1}-12"
