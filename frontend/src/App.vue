@@ -128,6 +128,7 @@ body { margin: 0; font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, 
 .el-aside {
   display: flex;
   flex-direction: column;
+  background-color: #304156;
 }
 .sidebar-logo {
   padding: 8px;
