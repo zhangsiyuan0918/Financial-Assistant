@@ -1097,3 +1097,156 @@ def get_forecast_backtest():
         "mape": round(mape, 1),
         "summary": f"历史 {len(backtest)} 个月预测，平均误差 {mape:.1f}%",
     }
+
+
+# ===================== 实时记账 =====================
+
+TRANSACTIONS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "实时记账.csv")
+TRANSACTION_FIELDS = ["date", "amount", "category", "type", "note", "created_at"]
+
+
+def _load_transactions():
+    if not os.path.exists(TRANSACTIONS_FILE):
+        return []
+    with open(TRANSACTIONS_FILE, "r", encoding="utf-8-sig") as f:
+        return list(csv.DictReader(f))
+
+
+def _save_transactions(rows):
+    os.makedirs(os.path.dirname(TRANSACTIONS_FILE), exist_ok=True)
+    with open(TRANSACTIONS_FILE, "w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=TRANSACTION_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def add_transaction(amount, category, note="", tx_type="支出"):
+    """记一笔账并返回实时分析"""
+    from datetime import datetime
+    now = datetime.now()
+    date_str = now.strftime("%Y-%m-%d")
+    month_str = now.strftime("%Y-%m")
+
+    tx = {
+        "date": date_str,
+        "amount": str(round(float(amount), 2)),
+        "category": category,
+        "type": tx_type,
+        "note": note,
+        "created_at": now.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    transactions = _load_transactions()
+    transactions.append(tx)
+    _save_transactions(transactions)
+
+    # 实时分析
+    return _analyze_after_transaction(tx)
+
+
+def _analyze_after_transaction(tx):
+    """记账后实时分析"""
+    from datetime import datetime
+    now = datetime.now()
+    month_str = now.strftime("%Y-%m")
+
+    transactions = _load_transactions()
+    month_txs = [t for t in transactions if t["date"][:7] == month_str]
+
+    # 当月分类汇总
+    category_totals = {}
+    month_total = 0
+    for t in month_txs:
+        cat = t["category"]
+        amt = float(t["amount"])
+        category_totals[cat] = category_totals.get(cat, 0) + amt
+        month_total += amt
+
+    # 预算对比
+    budget_config = _load_budget_config()
+    budget_status = []
+    for cat, budget in budget_config.items():
+        if budget <= 0:
+            continue
+        spent = category_totals.get(cat, 0)
+        ratio = round(spent / budget * 100, 1) if budget else 0
+        budget_status.append({
+            "category": cat,
+            "budget": budget,
+            "spent": round(spent, 2),
+            "remaining": round(max(budget - spent, 0), 2),
+            "ratio": ratio,
+            "status": "超支" if ratio > 100 else ("偏高" if ratio > 80 else "正常"),
+        })
+
+    # 总预算
+    total_budget = sum(b for b in budget_config.values() if b > 0)
+    total_spent = month_total
+    total_remaining = max(total_budget - total_spent, 0)
+
+    # AI 分析建议
+    suggestions = []
+    over_budget = [b for b in budget_status if b["ratio"] > 100]
+    warn_budget = [b for b in budget_status if 80 <= b["ratio"] <= 100]
+
+    if over_budget:
+        for b in over_budget:
+            suggestions.append(f"⚠️ {b['category']}已超支{b['ratio']:.0f}%（¥{b['spent']:,.0f}/¥{b['budget']:,.0f}），建议控制")
+    if warn_budget:
+        for b in warn_budget:
+            suggestions.append(f"⚡ {b['category']}接近上限{b['ratio']:.0f}%，剩余¥{b['remaining']:,.0f}")
+
+    # 与上月同期对比
+    prev_month = f"{now.year}-{now.month-1:02d}" if now.month > 1 else f"{now.year-1}-12"
+    prev_txs = [t for t in transactions if t["date"][:7] == prev_month]
+    prev_total = sum(float(t["amount"]) for t in prev_txs)
+    if prev_total > 0:
+        change = round((month_total - prev_total) / prev_total * 100, 1)
+        if change > 20:
+            suggestions.append(f"📈 本月支出比上月同期增长{change}%，注意控制")
+        elif change < -20:
+            suggestions.append(f"📉 本月支出比上月同期减少{abs(change)}%，继续保持")
+
+    # 最近5笔
+    recent_5 = [{"date": t["date"], "amount": float(t["amount"]), "category": t["category"], "note": t["note"]} for t in month_txs[-5:]]
+
+    return {
+        "recorded": tx,
+        "month_summary": {
+            "month": month_str,
+            "total": round(month_total, 2),
+            "count": len(month_txs),
+            "by_category": {k: round(v, 2) for k, v in sorted(category_totals.items(), key=lambda x: -x[1])},
+        },
+        "budget": {
+            "total_budget": total_budget,
+            "total_spent": round(total_spent, 2),
+            "total_remaining": round(total_remaining, 2),
+            "total_ratio": round(total_spent / total_budget * 100, 1) if total_budget else 0,
+            "items": sorted(budget_status, key=lambda x: -x["ratio"]),
+        },
+        "suggestions": suggestions,
+        "recent_5": recent_5,
+    }
+
+
+def get_quick_stats():
+    """获取当前月快速统计（供首页展示）"""
+    from datetime import datetime
+    month_str = datetime.now().strftime("%Y-%m")
+
+    transactions = _load_transactions()
+    month_txs = [t for t in transactions if t["date"][:7] == month_str]
+
+    total = sum(float(t["amount"]) for t in month_txs)
+    by_category = {}
+    for t in month_txs:
+        cat = t["category"]
+        by_category[cat] = by_category.get(cat, 0) + float(t["amount"])
+
+    return {
+        "month": month_str,
+        "total": round(total, 2),
+        "count": len(month_txs),
+        "by_category": {k: round(v, 2) for k, v in sorted(by_category.items(), key=lambda x: -x[1])},
+    }

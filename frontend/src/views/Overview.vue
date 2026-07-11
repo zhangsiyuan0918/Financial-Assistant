@@ -2,6 +2,9 @@
   <div>
     <h2>总览</h2>
 
+    <!-- Quick Entry -->
+    <QuickEntry @recorded="onRecorded" />
+
     <!-- Core metrics: 3 cards -->
     <el-row :gutter="12">
       <el-col :xs="24" :sm="8">
@@ -196,8 +199,10 @@
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
+import { ElMessage } from 'element-plus'
 import { fetchOverview, fetchAssetHistory, fetchBudget, updateAssets, updateBudget, uploadCsv, fetchHealth, fetchDbStatus, migrateDb, rollbackDb, fetchAlerts, backfillAssets } from '../api/index.js'
 import AiFloat from '../components/AiFloat.vue'
+import QuickEntry from '../components/QuickEntry.vue'
 import { createChart } from '../utils/chart.js'
 
 const o = ref({ assets: [], layers: [], net_worth: 0, cash_and_liquid: 0, investment: 0, restricted: 0, receivables: 0, bills_payable: 0, liquidity_coverage: 0, investment_ratio: 0, total_assets: 0, monthly_income: 0, monthly_balance: 0, monthly_expense: 0, avg_monthly_expense: 0 })
@@ -288,6 +293,11 @@ async function doBackfill() {
   } finally {
     backfilling.value = false
   }
+}
+
+function onRecorded(result) {
+  // 刷新预算数据
+  fetchBudget().then(data => { budget.value = data })
 }
 
 async function editBudget() {

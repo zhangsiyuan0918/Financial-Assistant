@@ -9,7 +9,7 @@ from auth import login, check_token, require_auth
 from utils import db, llm
 db.set_db_path(DB_PATH)
 from utils.query_engine import QueryEngine
-from utils.data_loader import get_overview, get_spending, get_monthly_trend, get_category_detail, get_income_analysis, get_asset_history, get_portfolio, get_seasonal_patterns, get_budget_status, get_monthly_report, update_assets, update_budget, get_alerts, resolve_alert, get_goals, create_goal, update_goal, delete_goal, get_financial_health, get_comparison, get_annual_report
+from utils.data_loader import get_overview, get_spending, get_monthly_trend, get_category_detail, get_income_analysis, get_asset_history, get_portfolio, get_seasonal_patterns, get_budget_status, get_monthly_report, update_assets, update_budget, get_alerts, resolve_alert, get_goals, create_goal, update_goal, delete_goal, get_financial_health, get_comparison, get_annual_report, add_transaction, get_quick_stats
 from utils.pipeline import run_full_pipeline, run_forecast_only
 
 app = Flask(__name__, static_folder=None)
@@ -104,6 +104,26 @@ def api_query_clear():
 @app.route("/api/overview")
 def api_overview():
     return jsonify(get_overview())
+
+
+@app.route("/api/quick-stats")
+def api_quick_stats():
+    return jsonify(get_quick_stats())
+
+
+@app.route("/api/transaction", methods=["POST"])
+def api_add_transaction():
+    data = request.get_json(force=True)
+    amount = data.get("amount")
+    category = data.get("category")
+    note = data.get("note", "")
+    tx_type = data.get("type", "支出")
+
+    if not amount or not category:
+        return jsonify({"error": "金额和分类必填"}), 400
+
+    result = add_transaction(float(amount), category, note, tx_type)
+    return jsonify(result)
 
 
 @app.route("/api/health")
