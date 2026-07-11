@@ -151,6 +151,27 @@
       </div>
     </el-card>
 
+    <!-- AI 智能洞察 -->
+    <el-card v-if="habits.ai_insights && habits.ai_insights.insights && habits.ai_insights.insights.length" style="margin-top:12px">
+      <template #header>
+        <el-space>
+          <span style="font-size:14px">AI 智能洞察</span>
+          <el-tag size="small" type="success">AI 分析</el-tag>
+        </el-space>
+      </template>
+      <div v-for="(insight, i) in habits.ai_insights.insights" :key="i"
+        style="padding:10px;margin-bottom:8px;border-radius:6px;font-size:13px"
+        :style="{background: insight.severity === 'danger' ? '#fef0f0' : insight.severity === 'warning' ? '#fdf6ec' : '#f0f9eb', borderLeft: '3px solid ' + (insight.severity === 'danger' ? '#f56c6c' : insight.severity === 'warning' ? '#e6a23c' : '#67c23a')}">
+        <div style="font-weight:bold;margin-bottom:4px">{{ insight.title }}</div>
+        <div style="color:#666">{{ insight.detail }}</div>
+      </div>
+    </el-card>
+    <el-card v-else-if="habits.ai_insights" style="margin-top:12px">
+      <div style="text-align:center;color:#999;padding:20px">
+        {{ habits.ai_insights.summary || 'AI 洞察生成中...' }}
+      </div>
+    </el-card>
+
     <AiFloat />
   </div>
 </template>

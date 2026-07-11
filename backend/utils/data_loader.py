@@ -1824,7 +1824,70 @@ def get_spending_habits():
     # 6. 消费集中度（TOP3分类占比）
     result["concentration"] = _analyze_concentration(expense, current_month)
 
+    # 7. AI 智能洞察
+    result["ai_insights"] = _generate_ai_insights(result, expense, current_month)
+
     return result
+
+
+def _generate_ai_insights(habits, expense, current_month):
+    """用 LLM 生成个性化消费洞察"""
+    from utils import llm
+
+    if not llm.is_configured():
+        return {"insights": [], "summary": "LLM 未配置，无法生成智能洞察"}
+
+    # 构建上下文
+    context = {
+        "消费速度": habits.get("spending_velocity", {}),
+        "星期模式": habits.get("weekday_pattern", {}),
+        "月内节奏": habits.get("monthly_rhythm", {}),
+        "消费频率": habits.get("spending_frequency", {}),
+        "分类趋势": habits.get("category_trends", []),
+        "消费集中度": habits.get("concentration", {}),
+    }
+
+    # 补充月度数据
+    recent = expense.groupby("month")["cny_amount"].sum().tail(6)
+    context["近6月支出"] = {str(k): round(v, 2) for k, v in recent.items()}
+
+    # 分类月度明细
+    cat_monthly = expense.groupby(["month", "category_l1"])["cny_amount"].sum().unstack(fill_value=0)
+    context["分类月度"] = {str(k): {cat: round(v, 2) for cat, v in v.items()} for k, v in cat_monthly.tail(3).iterrows()}
+
+    system_prompt = """你是一个专业的个人财务分析师。根据用户的消费数据，给出3-5条个性化、可执行的洞察建议。
+
+要求：
+1. 每条建议要具体、可操作，不要泛泛而谈
+2. 用数据说话，引用具体数字
+3. 关注异常变化和潜在风险
+4. 给出省钱或优化消费的具体方案
+5. 语言简洁，每条1-2句话
+
+输出格式（JSON数组）：
+[
+  {"title": "洞察标题", "detail": "具体分析和建议", "severity": "info/warning/danger"},
+  ...
+]"""
+
+    user_prompt = f"请分析以下消费数据，给出洞察建议：\n\n{json.dumps(context, ensure_ascii=False, indent=2)}"
+
+    response = llm.ask(user_prompt, system_prompt)
+
+    if not response:
+        return {"insights": [], "summary": "AI 分析失败"}
+
+    # 解析 LLM 响应
+    try:
+        # 尝试提取 JSON
+        json_match = re.search(r'\[.*\]', response, re.DOTALL)
+        if json_match:
+            insights = json.loads(json_match.group())
+            return {"insights": insights, "summary": ""}
+        else:
+            return {"insights": [{"title": "AI 分析", "detail": response, "severity": "info"}], "summary": ""}
+    except json.JSONDecodeError:
+        return {"insights": [{"title": "AI 分析", "detail": response, "severity": "info"}], "summary": ""}
 
 
 def _analyze_weekday_pattern(expense):
