@@ -185,7 +185,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, watch } from 'vue'
 import { fetchOverview, fetchAssetHistory, fetchBudget, updateAssets, updateBudget, uploadCsv, fetchHealth, fetchDbStatus, migrateDb, rollbackDb, fetchAlerts } from '../api/index.js'
 import AiFloat from '../components/AiFloat.vue'
 import * as echarts from 'echarts'
@@ -282,6 +282,50 @@ async function saveBudget() {
 
 const CHINESE_FONT = "'PingFang SC', 'Microsoft YaHei', sans-serif"
 
+let layerChartInstance = null
+let netWorthChartInstance = null
+
+function renderLayerChart() {
+  if (!layerChart.value) return
+  if (!layerChartInstance) layerChartInstance = echarts.init(layerChart.value)
+  const layersData = o.value.layers.filter(l => l.total > 0)
+  layerChartInstance.setOption({
+    tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
+    textStyle: { fontFamily: CHINESE_FONT },
+    series: [{
+      type: 'pie', radius: ['30%', '60%'],
+      data: layersData.map(l => ({ name: l.layer, value: l.total })),
+      label: { formatter: '{b}\n{d}%', fontFamily: CHINESE_FONT },
+      color: ['#409eff', '#e6a23c', '#909399', '#67c23a'],
+    }],
+  })
+}
+
+function renderNetWorthChart() {
+  if (!netWorthChart.value || !assetHistory.value.length) return
+  if (!netWorthChartInstance) netWorthChartInstance = echarts.init(netWorthChart.value)
+  const data = assetHistory.value
+  netWorthChartInstance.setOption({
+    tooltip: { trigger: 'axis' },
+    textStyle: { fontFamily: CHINESE_FONT },
+    grid: { left: 60, right: 20, bottom: 40 },
+    xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45, fontFamily: CHINESE_FONT } },
+    yAxis: { type: 'value', axisLabel: { formatter: '¥{value}', fontFamily: CHINESE_FONT } },
+    series: [{
+      name: '总资产', type: 'line', data: data.map(d => d.total),
+      smooth: true, areaStyle: { opacity: 0.15 }, lineStyle: { width: 2 },
+    }],
+  })
+}
+
+// Re-render charts when collapse panels are expanded
+watch(activeCollapse, (val) => {
+  nextTick(() => {
+    if (val.includes('assets')) renderLayerChart()
+    if (val.includes('trend')) renderNetWorthChart()
+  })
+})
+
 onMounted(async () => {
   o.value = await fetchOverview()
   assetHistory.value = await fetchAssetHistory()
@@ -289,38 +333,6 @@ onMounted(async () => {
   h.value = await fetchHealth()
   dbStatus.value = await fetchDbStatus()
   try { alerts.value = await fetchAlerts() } catch {}
-
-  nextTick(() => {
-    if (layerChart.value) {
-      const c = echarts.init(layerChart.value)
-      const layersData = o.value.layers.filter(l => l.total > 0)
-      c.setOption({
-        tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
-        textStyle: { fontFamily: CHINESE_FONT },
-        series: [{
-          type: 'pie', radius: ['30%', '60%'],
-          data: layersData.map(l => ({ name: l.layer, value: l.total })),
-          label: { formatter: '{b}\n{d}%', fontFamily: CHINESE_FONT },
-          color: ['#409eff', '#e6a23c', '#909399', '#67c23a'],
-        }],
-      })
-    }
-    if (netWorthChart.value && assetHistory.value.length) {
-      const c = echarts.init(netWorthChart.value)
-      const data = assetHistory.value
-      c.setOption({
-        tooltip: { trigger: 'axis' },
-        textStyle: { fontFamily: CHINESE_FONT },
-        grid: { left: 60, right: 20, bottom: 40 },
-        xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45, fontFamily: CHINESE_FONT } },
-        yAxis: { type: 'value', axisLabel: { formatter: '¥{value}', fontFamily: CHINESE_FONT } },
-        series: [{
-          name: '总资产', type: 'line', data: data.map(d => d.total),
-          smooth: true, areaStyle: { opacity: 0.15 }, lineStyle: { width: 2 },
-        }],
-      })
-    }
-  })
 })
 </script>
 
