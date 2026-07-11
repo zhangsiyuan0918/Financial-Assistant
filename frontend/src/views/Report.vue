@@ -143,7 +143,7 @@
 <script setup>
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { fetchMonthlyReport } from '../api/index.js'
-import * as echarts from 'echarts'
+import { createChart } from '../utils/chart.js'
 
 const r = ref({ budget: { items: [] }, mom_categories: [], yoy_categories: [], income_breakdown: [], asset: {} })
 const reportMonth = ref('')
@@ -158,9 +158,8 @@ async function load() {
 
 function renderPie() {
   if (!pieChart.value) return
-  const c = echarts.init(pieChart.value)
   const cats = r.value.all_categories ?? []
-  c.setOption({
+  createChart(pieChart.value, {
     tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
     series: [{
       type: 'pie', radius: ['30%', '60%'],

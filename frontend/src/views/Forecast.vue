@@ -80,7 +80,7 @@
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { fetchForecast, fetchForecastBacktest } from '../api/index.js'
 import AiFloat from '../components/AiFloat.vue'
-import * as echarts from 'echarts'
+import { createChart } from '../utils/chart.js'
 
 const forecastData = ref([])
 const annualTotal = ref(0)
@@ -112,19 +112,17 @@ onMounted(async () => {
 
   nextTick(() => {
     if (forecastChart.value) {
-      const c = echarts.init(forecastChart.value)
-      c.setOption({
+      createChart(forecastChart.value, {
         tooltip: { trigger: 'axis' },
-        textStyle: { fontFamily: CHINESE_FONT },
         grid: { left: 80, right: 20, bottom: 40 },
-        xAxis: { type: 'category', data: data.data.map(d => d.month), axisLabel: { rotate: 45, fontFamily: CHINESE_FONT } },
-        yAxis: { type: 'value', axisLabel: { formatter: '¥{value}', fontFamily: CHINESE_FONT } },
+        xAxis: { type: 'category', data: data.data.map(d => d.month), axisLabel: { rotate: 45 } },
+        yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
         series: [
           { name: '预测值', type: 'line', data: data.data.map(d => d.prediction), smooth: true, symbol: 'circle', lineStyle: { width: 3 }, itemStyle: { color: '#409eff' } },
           { name: '上限', type: 'line', data: data.data.map(d => d.upper), lineStyle: { type: 'dashed', width: 1 }, symbol: 'none', itemStyle: { color: '#b3d8ff' } },
           { name: '下限', type: 'line', data: data.data.map(d => d.lower), lineStyle: { type: 'dashed', width: 1 }, symbol: 'none', itemStyle: { color: '#b3d8ff' } },
         ],
-        legend: { bottom: 0, textStyle: { fontFamily: CHINESE_FONT } },
+        legend: { bottom: 0 },
       })
     }
   })

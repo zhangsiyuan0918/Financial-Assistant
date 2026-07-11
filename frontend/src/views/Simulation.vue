@@ -94,7 +94,7 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { fetchSimulation, fetchCalcTarget, fetchCalcYears, fetchCalcRate } from '../api/index.js'
 import AiFloat from '../components/AiFloat.vue'
-import * as echarts from 'echarts'
+import { createChart } from '../utils/chart.js'
 
 const tab = ref('forward')
 const expense = ref(9622)
@@ -116,8 +116,7 @@ async function runForward() {
   fwd.value = await fetchSimulation({ expense: expense.value, rate: rate.value, years: years.value })
   nextTick(() => {
     if (simChart.value) {
-      const c = echarts.init(simChart.value)
-      c.setOption({
+      const c = createChart(simChart.value, {
         tooltip: { trigger: 'axis' }, grid: { left: 80, bottom: 40 },
         xAxis: { type: 'category', data: fwd.value.projection.map(d => '第' + d.year + '年') },
         yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },

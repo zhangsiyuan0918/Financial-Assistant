@@ -1,71 +1,79 @@
 /**
- * Chart utilities: safe options for empty data, Chinese font support.
+ * ECharts 工具：中文字体 + 自动 resize + 空数据兜底
  */
+import * as echarts from 'echarts'
 
 const CHINESE_FONT = "'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif"
 
 /**
- * Wrap ECharts option with Chinese font and empty data fallback.
+ * 初始化 ECharts，自动应用中文字体和 resize 监听
  */
-export function safeChartOption(option, emptyText = '暂无数据') {
-  // Check if all series have no data
-  const hasData = option.series?.some(s => {
-    if (Array.isArray(s.data)) return s.data.length > 0
-    if (s.data && typeof s.data === 'object') return Object.keys(s.data).length > 0
-    return true
-  })
+export function createChart(el, option) {
+  const chart = echarts.init(el)
 
-  if (!hasData || !option.series?.length) {
-    return {
-      graphic: {
-        type: 'text',
-        left: 'center',
-        top: 'center',
-        style: { text: emptyText, fontSize: 14, fill: '#999', fontFamily: CHINESE_FONT }
-      }
-    }
-  }
+  // 自动 resize
+  const ro = new ResizeObserver(() => chart.resize())
+  ro.observe(el)
 
-  // Apply Chinese font to text elements
-  const result = { ...option }
-  result.textStyle = { ...(result.textStyle || {}), fontFamily: CHINESE_FONT }
+  // 注入中文字体
+  const enriched = injectFont(option)
+  chart.setOption(enriched)
+  return chart
+}
 
-  // Apply to axes
-  for (const axisKey of ['xAxis', 'yAxis']) {
-    const axes = Array.isArray(result[axisKey]) ? result[axisKey] : [result[axisKey]]
+/**
+ * 给 option 注入中文字体
+ */
+function injectFont(opt) {
+  if (!opt) return opt
+  const result = { ...opt }
+
+  // 全局 textStyle
+  result.textStyle = { fontFamily: CHINESE_FONT, ...(result.textStyle || {}) }
+
+  // xAxis / yAxis
+  for (const key of ['xAxis', 'yAxis']) {
+    const axes = Array.isArray(result[key]) ? result[key] : (result[key] ? [result[key]] : [])
     for (const axis of axes) {
       if (axis?.axisLabel) {
-        axis.axisLabel = { ...(axis.axisLabel || {}), fontFamily: CHINESE_FONT }
-      }
-      if (axis?.name) {
-        // axis name style
+        axis.axisLabel = { fontFamily: CHINESE_FONT, ...(axis.axisLabel || {}) }
       }
     }
   }
 
-  // Apply to legend
-  if (result.legend?.textStyle) {
-    result.legend.textStyle = { ...result.legend.textStyle, fontFamily: CHINESE_FONT }
+  // legend
+  if (result.legend) {
+    result.legend = { ...result.legend, textStyle: { fontFamily: CHINESE_FONT, ...(result.legend.textStyle || {}) } }
   }
 
-  // Apply to tooltip
-  if (result.tooltip?.textStyle) {
-    result.tooltip.textStyle = { ...result.tooltip.textStyle, fontFamily: CHINESE_FONT }
+  // tooltip
+  if (result.tooltip) {
+    result.tooltip = { ...result.tooltip, textStyle: { fontFamily: CHINESE_FONT, ...(result.tooltip.textStyle || {}) } }
+  }
+
+  // series labels
+  if (result.series) {
+    result.series = result.series.map(s => {
+      if (s.label) {
+        s = { ...s, label: { fontFamily: CHINESE_FONT, ...(s.label || {}) } }
+      }
+      return s
+    })
   }
 
   return result
 }
 
 /**
- * Initialize an ECharts instance with auto-resize.
+ * 空数据兜底 option
  */
-export function initChart(el, option) {
-  const echarts = require('echarts')
-  const chart = echarts.init(el)
-
-  const ro = new ResizeObserver(() => chart.resize())
-  ro.observe(el)
-
-  chart.setOption(safeChartOption(option))
-  return chart
+export function emptyChartOption(text = '暂无数据') {
+  return {
+    graphic: {
+      type: 'text',
+      left: 'center',
+      top: 'center',
+      style: { text, fontSize: 14, fill: '#999', fontFamily: CHINESE_FONT }
+    }
+  }
 }

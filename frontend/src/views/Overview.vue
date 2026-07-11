@@ -191,7 +191,7 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { fetchOverview, fetchAssetHistory, fetchBudget, updateAssets, updateBudget, uploadCsv, fetchHealth, fetchDbStatus, migrateDb, rollbackDb, fetchAlerts } from '../api/index.js'
 import AiFloat from '../components/AiFloat.vue'
-import * as echarts from 'echarts'
+import { createChart } from '../utils/chart.js'
 
 const o = ref({ assets: [], layers: [], net_worth: 0, cash_and_liquid: 0, investment: 0, restricted: 0, receivables: 0, bills_payable: 0, liquidity_coverage: 0, investment_ratio: 0, total_assets: 0, monthly_income: 0, monthly_balance: 0, monthly_expense: 0, avg_monthly_expense: 0 })
 const h = ref({ items: [], total_score: 0, level: '' })
@@ -295,29 +295,25 @@ onMounted(async () => {
   nextTick(() => {
     // Layer pie chart
     if (layerChart.value) {
-      const c = echarts.init(layerChart.value)
       const layersData = o.value.layers.filter(l => l.total > 0)
-      c.setOption({
+      createChart(layerChart.value, {
         tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
-        textStyle: { fontFamily: CHINESE_FONT },
         series: [{
           type: 'pie', radius: ['35%', '65%'],
           data: layersData.map(l => ({ name: l.layer, value: l.total })),
-          label: { formatter: '{b}\n{d}%', fontFamily: CHINESE_FONT },
+          label: { formatter: '{b}\n{d}%' },
           color: ['#409eff', '#e6a23c', '#909399', '#67c23a'],
         }],
       })
     }
     // Net worth trend
     if (netWorthChart.value && assetHistory.value.length) {
-      const c = echarts.init(netWorthChart.value)
       const data = assetHistory.value
-      c.setOption({
+      createChart(netWorthChart.value, {
         tooltip: { trigger: 'axis' },
-        textStyle: { fontFamily: CHINESE_FONT },
         grid: { left: 60, right: 20, bottom: 40 },
-        xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45, fontFamily: CHINESE_FONT } },
-        yAxis: { type: 'value', axisLabel: { formatter: '¥{value}', fontFamily: CHINESE_FONT } },
+        xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45 } },
+        yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
         series: [{
           name: '总资产', type: 'line', data: data.map(d => d.total),
           smooth: true, areaStyle: { opacity: 0.15 }, lineStyle: { width: 2 },

@@ -35,7 +35,7 @@
 <script setup>
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { fetchIncome } from '../api/index.js'
-import * as echarts from 'echarts'
+import { createChart } from '../utils/chart.js'
 
 const data = ref({ categories: [], total: 0, trend: [] })
 const pieChart = ref(null)
@@ -53,15 +53,13 @@ onMounted(async () => {
   data.value = await fetchIncome()
   nextTick(() => {
     if (pieChart.value) {
-      const c = echarts.init(pieChart.value)
-      c.setOption({
+      createChart(pieChart.value, {
         tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
         series: [{ type: 'pie', radius: ['30%', '60%'], data: data.value.categories.map(i => ({ name: i.category, value: i.amount })), label: { formatter: '{b}\n{d}%' } }],
       })
     }
     if (trendChart.value) {
-      const c = echarts.init(trendChart.value)
-      c.setOption({
+      createChart(trendChart.value, {
         tooltip: { trigger: 'axis' }, grid: { left: 60, right: 20, bottom: 40 },
         xAxis: { type: 'category', data: data.value.trend.map(d => d.month), axisLabel: { rotate: 45 } },
         yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },

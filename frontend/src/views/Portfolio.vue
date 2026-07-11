@@ -38,7 +38,7 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { fetchPortfolio } from '../api/index.js'
-import * as echarts from 'echarts'
+import { createChart } from '../utils/chart.js'
 
 const data = ref({ items: [], total_cost: 0, total_current: 0, total_pnl: 0, total_pnl_pct: 0 })
 const pieChart = ref(null)
@@ -49,15 +49,13 @@ onMounted(async () => {
   data.value = await fetchPortfolio()
   nextTick(() => {
     if (pieChart.value) {
-      const c = echarts.init(pieChart.value)
-      c.setOption({
+      createChart(pieChart.value, {
         tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
         series: [{ type: 'pie', radius: ['30%', '60%'], data: data.value.items.map(i => ({ name: i.account, value: i.current })), label: { formatter: '{b}\n{d}%' } }],
       })
     }
     if (barChart.value) {
-      const c = echarts.init(barChart.value)
-      c.setOption({
+      createChart(barChart.value, {
         tooltip: { trigger: 'axis' }, grid: { left: 60, right: 20 },
         xAxis: { type: 'category', data: data.value.items.map(i => i.account) },
         yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },

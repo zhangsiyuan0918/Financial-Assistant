@@ -92,7 +92,7 @@
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { fetchSpending, fetchSpendingDetail, fetchSeasonal, fetchComparison } from '../api/index.js'
 import AiFloat from '../components/AiFloat.vue'
-import * as echarts from 'echarts'
+import { createChart } from '../utils/chart.js'
 
 const year = ref('all')
 const years = ref([])
@@ -119,13 +119,11 @@ const fmt = v => '¥' + Number(v).toLocaleString('zh-CN', { minimumFractionDigit
 
 function renderCharts(data) {
   if (!pieChart.value || !barChart.value) return
-  if (!pieInstance) pieInstance = echarts.init(pieChart.value)
-  if (!barInstance) barInstance = echarts.init(barChart.value)
-  pieInstance.setOption({
+  if (!pieInstance) pieInstance = createChart(pieChart.value, {
     tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
     series: [{ type: 'pie', radius: ['30%', '60%'], data: data.categories.map(i => ({ name: i.category, value: i.amount })), label: { formatter: '{b}\n{d}%' } }],
   })
-  barInstance.setOption({
+  if (!barInstance) barInstance = createChart(barChart.value, {
     tooltip: { trigger: 'axis' }, grid: { left: 80, right: 20 },
     xAxis: { type: 'category', data: data.categories.map(i => i.category), axisLabel: { rotate: 30 } },
     yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
@@ -148,8 +146,7 @@ async function showDetail(row) {
   detailData.value = data.sub_categories
   await nextTick()
   if (detailChart.value) {
-    if (!detailInstance) detailInstance = echarts.init(detailChart.value)
-    detailInstance.setOption({
+    if (!detailInstance) detailInstance = createChart(detailChart.value, {
       tooltip: { trigger: 'axis' }, grid: { left: 80 },
       xAxis: { type: 'category', data: data.sub_categories.map(i => i.sub_category), axisLabel: { rotate: 30 } },
       yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
@@ -163,10 +160,9 @@ async function loadSeasonal() {
   seasonalCats.value = data.seasonal_categories
   nextTick(() => {
     if (seasonalChart.value) {
-      if (!seasonalInstance) seasonalInstance = echarts.init(seasonalChart.value)
       const months = data.month_pattern
       const colors = months.map(m => m.diff_pct > 15 ? '#f56c6c' : m.diff_pct < -15 ? '#67c23a' : '#409eff')
-      seasonalInstance.setOption({
+      if (!seasonalInstance) seasonalInstance = createChart(seasonalChart.value, {
         tooltip: { trigger: 'axis' }, grid: { left: 50, right: 20, bottom: 30 },
         xAxis: { type: 'category', data: months.map(m => m.month + '月') },
         yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
