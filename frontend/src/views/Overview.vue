@@ -3,7 +3,7 @@
     <h2>总览</h2>
 
     <!-- Core metrics: 3 cards -->
-    <el-row :gutter="16">
+    <el-row :gutter="12">
       <el-col :xs="24" :sm="8">
         <el-card shadow="hover" class="metric-card">
           <div class="metric-center">
@@ -36,100 +36,103 @@
       </el-col>
     </el-row>
 
-    <!-- Quick actions -->
-    <el-row :gutter="16" style="margin-top:4px">
-      <el-col :xs="12" :sm="6" v-for="item in quickActions" :key="item.path">
-        <el-card shadow="hover" class="quick-card" @click="$router.push(item.path)">
-          <div class="metric-center">
-            <div style="font-size:28px">{{ item.icon }}</div>
-            <div style="margin-top:6px;font-size:13px;color:#666">{{ item.label }}</div>
+    <!-- Charts + Alert summary in one row -->
+    <el-row :gutter="12" style="margin-top:0">
+      <el-col :xs="24" :sm="14">
+        <el-card>
+          <template #header><span style="font-size:14px">资产分层</span></template>
+          <div ref="layerChart" style="height:280px"></div>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="10">
+        <el-card v-if="alerts.length">
+          <template #header>
+            <el-space>
+              <el-icon color="#e6a23c"><WarningFilled /></el-icon>
+              <span style="font-size:14px">预警摘要</span>
+            </el-space>
+          </template>
+          <div v-for="a in alerts.slice(0, 3)" :key="a.id" class="alert-row">
+            <el-tag :type="a.severity === 'high' ? 'danger' : 'warning'" size="small" style="margin-right:6px">
+              {{ a.type === 'budget_over' ? '预算' : a.type === 'liquidity' ? '流动性' : '异常' }}
+            </el-tag>
+            <span>{{ a.message }}</span>
+          </div>
+          <el-button size="small" text @click="$router.push('/alerts')" style="margin-top:8px">查看全部</el-button>
+        </el-card>
+        <el-card v-else>
+          <template #header><span style="font-size:14px">快捷入口</span></template>
+          <el-row :gutter="8">
+            <el-col :span="12" v-for="item in quickActions" :key="item.path">
+              <div class="quick-item" @click="$router.push(item.path)">
+                <span style="font-size:20px">{{ item.icon }}</span>
+                <span style="font-size:12px;color:#666">{{ item.label }}</span>
+              </div>
+            </el-col>
+          </el-row>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- Net worth trend -->
+    <el-card style="margin-top:0">
+      <template #header><span style="font-size:14px">净资产走势</span></template>
+      <div ref="netWorthChart" style="height:220px"></div>
+    </el-card>
+
+    <!-- Asset detail + Budget in one row -->
+    <el-row :gutter="12" style="margin-top:0">
+      <el-col :xs="24" :sm="14">
+        <el-card>
+          <template #header>
+            <el-space>
+              <span style="font-size:14px">资产明细</span>
+              <el-button size="small" type="primary" plain @click="editAssets">编辑</el-button>
+            </el-space>
+          </template>
+          <el-table :data="o.assets" stripe size="small" style="width: 100%">
+            <el-table-column prop="name" label="项目" min-width="100" />
+            <el-table-column prop="amount" label="金额" width="120">
+              <template #default="{row}">{{ fmt(row.amount) }}</template>
+            </el-table-column>
+            <el-table-column prop="ratio" label="占比" width="80">
+              <template #default="{row}">{{ row.ratio }}%</template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="10">
+        <el-card v-if="budget.items && budget.items.length">
+          <template #header>
+            <el-space>
+              <span style="font-size:14px">本月预算</span>
+              <el-button size="small" text @click="editBudget">编辑</el-button>
+            </el-space>
+          </template>
+          <div v-for="item in budget.items" :key="item.category" class="budget-row">
+            <span class="budget-cat">{{ item.category }}</span>
+            <el-progress :percentage="Math.min(item.ratio, 100)" :stroke-width="8" style="flex:1;margin:0 6px"
+              :color="item.ratio > 100 ? '#f56c6c' : item.ratio > 80 ? '#e6a23c' : '#409eff'" />
+            <span class="budget-num">{{ fmt(item.actual) }}/{{ fmt(item.budget) }}</span>
           </div>
         </el-card>
       </el-col>
     </el-row>
 
-    <!-- Alert summary (if any) -->
-    <el-card v-if="alerts.length" style="margin-top:12px">
-      <template #header>
-        <el-space>
-          <el-icon color="#e6a23c"><WarningFilled /></el-icon>
-          <span>预警摘要</span>
-          <el-button size="small" text @click="$router.push('/alerts')">查看全部</el-button>
-        </el-space>
-      </template>
-      <div v-for="a in alerts.slice(0, 3)" :key="a.id" class="alert-row">
-        <el-tag :type="a.severity === 'high' ? 'danger' : 'warning'" size="small" style="margin-right:8px">
-          {{ a.type === 'budget_over' ? '预算' : a.type === 'liquidity' ? '流动性' : '异常' }}
-        </el-tag>
-        <span>{{ a.message }}</span>
-      </div>
+    <!-- Data management -->
+    <el-card style="margin-top:0">
+      <template #header><span style="font-size:14px">数据管理</span></template>
+      <el-space wrap>
+        <el-button size="small" type="primary" plain @click="uploadVisible = true">导入 CSV</el-button>
+        <el-tag v-if="dbStatus.migrated" type="success" size="small">SQLite</el-tag>
+        <el-tag v-else type="info" size="small">CSV</el-tag>
+        <span v-if="dbStatus.stats" style="font-size:12px;color:#999">
+          {{ dbStatus.stats.records }} 条（{{ dbStatus.stats.date_from }} ~ {{ dbStatus.stats.date_to }}）
+        </span>
+        <el-button v-if="!dbStatus.migrated" size="small" type="warning" plain :loading="migrating" @click="doMigrate">迁移</el-button>
+        <el-button v-if="dbStatus.migrated" size="small" type="danger" plain @click="doRollback">回滚</el-button>
+      </el-space>
     </el-card>
-
-    <!-- Charts (collapsible) -->
-    <el-collapse v-model="activeCollapse" style="margin-top:12px">
-      <el-collapse-item title="资产分层" name="assets">
-        <div ref="layerChart" style="height: 300px"></div>
-      </el-collapse-item>
-      <el-collapse-item title="净资产走势" name="trend">
-        <div ref="netWorthChart" style="height: 300px"></div>
-      </el-collapse-item>
-    </el-collapse>
-
-    <!-- Asset detail -->
-    <el-card style="margin-top:12px">
-      <template #header>
-        <el-space>
-          <span>资产明细</span>
-          <el-button size="small" type="primary" plain @click="editAssets">编辑</el-button>
-        </el-space>
-      </template>
-      <el-table :data="o.assets" stripe size="small" style="width: 100%">
-        <el-table-column prop="name" label="项目" min-width="100" />
-        <el-table-column prop="layer" label="层级" width="90" />
-        <el-table-column prop="amount" label="金额" width="120">
-          <template #default="{row}">{{ fmt(row.amount) }}</template>
-        </el-table-column>
-        <el-table-column prop="ratio" label="占比" width="80">
-          <template #default="{row}">{{ row.ratio }}%</template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- Budget -->
-    <el-card v-if="budget.items && budget.items.length" style="margin-top:12px">
-      <template #header>
-        <el-space>
-          <span>本月预算（{{ budget.month }}）</span>
-          <el-button size="small" text @click="editBudget">编辑</el-button>
-        </el-space>
-      </template>
-      <el-row :gutter="8">
-        <el-col :xs="8" :sm="4" v-for="item in budget.items" :key="item.category">
-          <div style="text-align:center;padding:4px 0">
-            <div style="font-size:12px;color:#999">{{ item.category }}</div>
-            <el-progress type="dashboard" :percentage="Math.min(item.ratio, 100)" :width="56" :stroke-width="6"
-              :color="item.ratio > 100 ? '#f56c6c' : item.ratio > 80 ? '#e6a23c' : '#409eff'" />
-            <div style="font-size:11px;margin-top:2px">{{ fmt(item.actual) }}/{{ fmt(item.budget) }}</div>
-          </div>
-        </el-col>
-      </el-row>
-    </el-card>
-
-    <!-- Data management (collapsed) -->
-    <el-collapse style="margin-top:12px">
-      <el-collapse-item title="数据管理">
-        <el-space wrap>
-          <el-button size="small" type="primary" plain @click="uploadVisible = true">导入 CSV</el-button>
-          <el-tag v-if="dbStatus.migrated" type="success" size="small">SQLite</el-tag>
-          <el-tag v-else type="info" size="small">CSV</el-tag>
-          <span v-if="dbStatus.stats" style="font-size:12px;color:#999">
-            {{ dbStatus.stats.records }} 条（{{ dbStatus.stats.date_from }} ~ {{ dbStatus.stats.date_to }}）
-          </span>
-          <el-button v-if="!dbStatus.migrated" size="small" type="warning" plain :loading="migrating" @click="doMigrate">迁移</el-button>
-          <el-button v-if="dbStatus.migrated" size="small" type="danger" plain @click="doRollback">回滚</el-button>
-        </el-space>
-      </el-collapse-item>
-    </el-collapse>
 
     <!-- Dialogs -->
     <el-dialog v-model="editVisible" title="编辑资产" width="500px">
@@ -185,7 +188,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { fetchOverview, fetchAssetHistory, fetchBudget, updateAssets, updateBudget, uploadCsv, fetchHealth, fetchDbStatus, migrateDb, rollbackDb, fetchAlerts } from '../api/index.js'
 import AiFloat from '../components/AiFloat.vue'
 import * as echarts from 'echarts'
@@ -206,7 +209,6 @@ const budgetEditForm = ref([])
 const uploadVisible = ref(false)
 const uploadResult = ref(null)
 const uploading = ref(false)
-const activeCollapse = ref([])
 const layers = ['现金/活期', '投资资产', '受限资产', '应收']
 const fmt = v => '¥' + Number(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 
@@ -282,50 +284,6 @@ async function saveBudget() {
 
 const CHINESE_FONT = "'PingFang SC', 'Microsoft YaHei', sans-serif"
 
-let layerChartInstance = null
-let netWorthChartInstance = null
-
-function renderLayerChart() {
-  if (!layerChart.value) return
-  if (!layerChartInstance) layerChartInstance = echarts.init(layerChart.value)
-  const layersData = o.value.layers.filter(l => l.total > 0)
-  layerChartInstance.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
-    textStyle: { fontFamily: CHINESE_FONT },
-    series: [{
-      type: 'pie', radius: ['30%', '60%'],
-      data: layersData.map(l => ({ name: l.layer, value: l.total })),
-      label: { formatter: '{b}\n{d}%', fontFamily: CHINESE_FONT },
-      color: ['#409eff', '#e6a23c', '#909399', '#67c23a'],
-    }],
-  })
-}
-
-function renderNetWorthChart() {
-  if (!netWorthChart.value || !assetHistory.value.length) return
-  if (!netWorthChartInstance) netWorthChartInstance = echarts.init(netWorthChart.value)
-  const data = assetHistory.value
-  netWorthChartInstance.setOption({
-    tooltip: { trigger: 'axis' },
-    textStyle: { fontFamily: CHINESE_FONT },
-    grid: { left: 60, right: 20, bottom: 40 },
-    xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45, fontFamily: CHINESE_FONT } },
-    yAxis: { type: 'value', axisLabel: { formatter: '¥{value}', fontFamily: CHINESE_FONT } },
-    series: [{
-      name: '总资产', type: 'line', data: data.map(d => d.total),
-      smooth: true, areaStyle: { opacity: 0.15 }, lineStyle: { width: 2 },
-    }],
-  })
-}
-
-// Re-render charts when collapse panels are expanded
-watch(activeCollapse, (val) => {
-  nextTick(() => {
-    if (val.includes('assets')) renderLayerChart()
-    if (val.includes('trend')) renderNetWorthChart()
-  })
-})
-
 onMounted(async () => {
   o.value = await fetchOverview()
   assetHistory.value = await fetchAssetHistory()
@@ -333,19 +291,60 @@ onMounted(async () => {
   h.value = await fetchHealth()
   dbStatus.value = await fetchDbStatus()
   try { alerts.value = await fetchAlerts() } catch {}
+
+  nextTick(() => {
+    // Layer pie chart
+    if (layerChart.value) {
+      const c = echarts.init(layerChart.value)
+      const layersData = o.value.layers.filter(l => l.total > 0)
+      c.setOption({
+        tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
+        textStyle: { fontFamily: CHINESE_FONT },
+        series: [{
+          type: 'pie', radius: ['35%', '65%'],
+          data: layersData.map(l => ({ name: l.layer, value: l.total })),
+          label: { formatter: '{b}\n{d}%', fontFamily: CHINESE_FONT },
+          color: ['#409eff', '#e6a23c', '#909399', '#67c23a'],
+        }],
+      })
+    }
+    // Net worth trend
+    if (netWorthChart.value && assetHistory.value.length) {
+      const c = echarts.init(netWorthChart.value)
+      const data = assetHistory.value
+      c.setOption({
+        tooltip: { trigger: 'axis' },
+        textStyle: { fontFamily: CHINESE_FONT },
+        grid: { left: 60, right: 20, bottom: 40 },
+        xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45, fontFamily: CHINESE_FONT } },
+        yAxis: { type: 'value', axisLabel: { formatter: '¥{value}', fontFamily: CHINESE_FONT } },
+        series: [{
+          name: '总资产', type: 'line', data: data.map(d => d.total),
+          smooth: true, areaStyle: { opacity: 0.15 }, lineStyle: { width: 2 },
+        }],
+      })
+    }
+  })
 })
 </script>
 
 <style scoped>
 .metric-card { text-align: center; }
-.metric-center { text-align: center; padding: 4px 0; }
+.metric-center { text-align: center; padding: 2px 0; }
 .metric-label { color: #999; font-size: 13px; }
-.metric-value { font-size: 24px; font-weight: bold; margin-top: 8px; }
+.metric-value { font-size: 24px; font-weight: bold; margin-top: 6px; }
 .metric-sub { font-size: 12px; color: #999; margin-top: 4px; }
 
-.quick-card { cursor: pointer; transition: transform .2s; }
-.quick-card:hover { transform: translateY(-2px); }
+.quick-item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 12px 0; cursor: pointer; border-radius: 6px; transition: background .2s;
+}
+.quick-item:hover { background: #f5f7fa; }
 
-.alert-row { padding: 8px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
+.alert-row { padding: 6px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
 .alert-row:last-child { border-bottom: none; }
+
+.budget-row { display: flex; align-items: center; padding: 3px 0; font-size: 12px; }
+.budget-cat { width: 42px; color: #999; flex-shrink: 0; }
+.budget-num { width: 90px; text-align: right; color: #666; flex-shrink: 0; }
 </style>
