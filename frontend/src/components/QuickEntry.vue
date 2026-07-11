@@ -111,13 +111,48 @@
         </div>
       </div>
     </div>
+
+    <!-- 信用卡状态 -->
+    <div v-if="creditCard.balance > 0" style="margin-top:12px;padding:12px;background:#fef0f0;border-radius:4px;border:1px solid #fbc4c4">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div>
+          <span style="font-weight:bold;font-size:13px;color:#f56c6c">信用卡待还</span>
+          <span style="font-size:20px;font-weight:bold;color:#f56c6c;margin-left:8px">¥{{ creditCard.balance.toLocaleString() }}</span>
+        </div>
+        <button @click="showPayCC = !showPayCC"
+          style="padding:6px 12px;background:#f56c6c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">
+          {{ showPayCC ? '取消' : '还款' }}
+        </button>
+      </div>
+      <!-- 还款表单 -->
+      <div v-if="showPayCC" style="margin-top:8px;display:flex;gap:8px;align-items:center">
+        <el-input-number v-model="payAmount" :min="0" :max="creditCard.balance" :step="100" size="small" style="width:140px" />
+        <el-select v-model="payAccount" size="small" style="width:120px" placeholder="还款账户">
+          <el-option v-for="acc in accounts" :key="acc" :label="acc" :value="acc" />
+        </el-select>
+        <button @click="doPayCC" :disabled="!payAmount || payAmount > creditCard.balance"
+          style="padding:6px 16px;background:#67c23a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">
+          确认还款
+        </button>
+      </div>
+      <!-- 最近信用卡记录 -->
+      <div v-if="creditCard.history.length" style="margin-top:8px">
+        <div v-for="(tx, i) in creditCard.history.slice().reverse().slice(0, 3)" :key="i"
+          style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-top:1px solid #fde2e2">
+          <span>{{ tx.date }} {{ tx.note }}</span>
+          <span :style="{color: tx.type === '消费' ? '#f56c6c' : '#67c23a'}">
+            {{ tx.type === '消费' ? '+' : '-' }}¥{{ tx.amount.toLocaleString() }}
+          </span>
+        </div>
+      </div>
+    </div>
   </el-card>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { fetchTransactions } from '../api/index.js'
+import { fetchTransactions, fetchCreditCard, payCreditCard } from '../api/index.js'
 
 const emit = defineEmits(['recorded', 'deleted'])
 
@@ -143,6 +178,10 @@ const historyMonths = ref([])
 const historyMonth = ref('')
 const historyLoading = ref(false)
 const accounts = ref([])
+const creditCard = ref({ balance: 0, history: [] })
+const showPayCC = ref(false)
+const payAmount = ref(0)
+const payAccount = ref('招行储蓄卡')
 
 async function submit() {
   if (!form.value.amount || !form.value.category) return
@@ -203,9 +242,30 @@ async function deleteTx(tx) {
 
 onMounted(async () => {
   loadHistory()
+  loadCreditCard()
   try {
     const res = await fetch('/api/accounts').then(r => r.json())
     accounts.value = res
   } catch {}
 })
+
+async function loadCreditCard() {
+  try {
+    creditCard.value = await fetchCreditCard()
+  } catch {}
+}
+
+async function doPayCC() {
+  if (!payAmount.value || payAmount.value > creditCard.value.balance) return
+  try {
+    await payCreditCard({ amount: payAmount.value, account: payAccount.value })
+    ElMessage.success('还款成功')
+    payAmount.value = 0
+    showPayCC.value = false
+    loadCreditCard()
+    emit('deleted')  // 触发父组件刷新
+  } catch (e) {
+    ElMessage.error('还款失败')
+  }
+}
 </script>
