@@ -4,56 +4,49 @@
       <span style="font-size:14px;font-weight:bold">记一笔</span>
     </template>
 
-    <el-form :model="form" label-width="40px" size="default">
-      <el-row :gutter="8">
-        <el-col :span="4">
-          <el-form-item>
-            <el-radio-group v-model="form.type" size="small" @change="form.category = ''">
-              <el-radio-button value="支出">支出</el-radio-button>
-              <el-radio-button value="收入">收入</el-radio-button>
-            </el-radio-group>
-          </el-form-item>
-        </el-col>
-        <el-col :span="5">
-          <el-form-item label="日期">
-            <el-date-picker v-model="form.date" type="date" value-format="YYYY-MM-DD" style="width:100%" :shortcuts="dateShortcuts" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="4">
-          <el-form-item label="金额">
-            <el-input-number v-model="form.amount" :min="0.01" :step="10" :precision="2" style="width:100%" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="4">
-          <el-form-item label="分类">
-            <el-select v-model="form.category" style="width:100%" placeholder="分类">
-              <el-option v-for="cat in currentCategories" :key="cat" :label="cat" :value="cat" />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="4">
-          <el-form-item label="账户">
-            <el-select v-model="form.account" style="width:100%" placeholder="账户">
-              <el-option v-for="acc in accounts" :key="acc" :label="acc" :value="acc" />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="3">
-          <el-form-item>
-            <el-button type="primary" @click="submit" :loading="loading" :disabled="!form.amount || !form.category"
-              :style="{ background: form.type === '收入' ? '#67c23a' : '' }">
-              记账
-            </el-button>
-          </el-form-item>
-        </el-col>
-      </el-row>
-    </el-form>
+    <!-- 第一行：输入字段 -->
+    <el-row :gutter="8" align="middle">
+      <el-col :span="3">
+        <el-radio-group v-model="form.type" size="small" @change="form.category = ''">
+          <el-radio-button value="支出">支出</el-radio-button>
+          <el-radio-button value="收入">收入</el-radio-button>
+        </el-radio-group>
+      </el-col>
+      <el-col :span="4">
+        <el-date-picker v-model="form.date" type="date" value-format="YYYY-MM-DD" size="small" style="width:100%" :shortcuts="dateShortcuts" />
+      </el-col>
+      <el-col :span="4">
+        <el-input-number v-model="form.amount" :min="0.01" :step="10" :precision="2" size="small" style="width:100%" placeholder="金额" />
+      </el-col>
+      <el-col :span="4">
+        <el-select v-model="form.category" size="small" style="width:100%" placeholder="分类">
+          <el-option v-for="cat in currentCategories" :key="cat" :label="cat" :value="cat" />
+        </el-select>
+      </el-col>
+      <el-col :span="4">
+        <el-select v-model="form.account" size="small" style="width:100%" placeholder="账户">
+          <el-option v-for="acc in accounts" :key="acc" :label="acc" :value="acc" />
+        </el-select>
+      </el-col>
+      <el-col :span="5">
+        <el-input v-model="form.note" size="small" placeholder="备注" clearable />
+      </el-col>
+    </el-row>
 
-    <div style="margin-top:4px">
-      <el-button size="small" text @click="showHistory = !showHistory">
-        {{ showHistory ? '收起历史' : '查看历史记录' }}
-      </el-button>
-    </div>
+    <!-- 第二行：按钮 -->
+    <el-row :gutter="8" style="margin-top:8px">
+      <el-col :span="4">
+        <el-button type="primary" size="small" @click="submit" :loading="loading" :disabled="!form.amount || !form.category"
+          :style="{ background: form.type === '收入' ? '#67c23a' : '', borderColor: form.type === '收入' ? '#67c23a' : '' }">
+          记账
+        </el-button>
+      </el-col>
+      <el-col :span="4">
+        <el-button size="small" @click="showHistory = !showHistory">
+          {{ showHistory ? '收起历史' : '查看历史记录' }}
+        </el-button>
+      </el-col>
+    </el-row>
 
     <!-- 分析结果 -->
     <div v-if="analysis" class="analysis-result">
