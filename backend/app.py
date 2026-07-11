@@ -1,0 +1,551 @@
+import json, os, sys, math, threading
+from collections import defaultdict
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from flask import Flask, jsonify, send_from_directory, request, session
+from flask_cors import CORS
+
+from config import FORECAST_FILE, MONTHLY_FILE, DATA_DIR, UPLOAD_DIR, V4_FILE, DB_PATH
+from auth import login, check_token, require_auth
+from utils import db, llm
+db.set_db_path(DB_PATH)
+from utils.query_engine import QueryEngine
+from utils.data_loader import get_overview, get_spending, get_monthly_trend, get_category_detail, get_income_analysis, get_asset_history, get_portfolio, get_seasonal_patterns, get_budget_status, get_monthly_report, update_assets, update_budget, get_alerts, resolve_alert, get_goals, create_goal, update_goal, delete_goal, get_financial_health, get_comparison, get_annual_report
+from utils.pipeline import run_full_pipeline, run_forecast_only
+
+app = Flask(__name__, static_folder=None)
+CORS(app)
+DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist")
+
+
+def serve_frontend(path="index.html"):
+    file_path = os.path.join(DIST_DIR, path)
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return send_from_directory(DIST_DIR, path)
+    # SPA fallback
+    index_path = os.path.join(DIST_DIR, "index.html")
+    if os.path.exists(index_path):
+        return send_from_directory(DIST_DIR, "index.html")
+    return jsonify({"error": "frontend not built"}), 404
+
+
+def load_json(path):
+    if not os.path.exists(path):
+        return None
+    import csv
+    rows = []
+    with open(path, "r", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows.append(row)
+    return rows
+
+
+def load_monthly_json():
+    if not os.path.exists(MONTHLY_FILE):
+        return None
+    import csv
+    rows = []
+    with open(MONTHLY_FILE, "r", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows.append({"ds": row["ds"][:7], "y": round(float(row["y"]), 2)})
+    return rows
+
+
+# ---- API Routes ----
+
+_query_engine = None
+_conversations = defaultdict(list)  # session_id -> [{"role": ..., "content": ...}]
+_conversation_lock = threading.Lock()
+
+def get_query_engine():
+    global _query_engine
+    if _query_engine is None:
+        from utils import data_loader as dl
+        _query_engine = QueryEngine(dl)
+    return _query_engine
+
+
+@app.route("/api/query", methods=["POST"])
+def api_query():
+    data = request.get_json(force=True)
+    question = data.get("question", "")
+    session_id = data.get("session_id", "default")
+    if not question:
+        return jsonify({"answer": "请说点什么", "intent": "help"})
+
+    # Get conversation history
+    with _conversation_lock:
+        history = list(_conversations[session_id])
+
+    engine = get_query_engine()
+    answer = engine.answer(question, history=history)
+
+    # Append to history
+    with _conversation_lock:
+        _conversations[session_id].append({"role": "user", "content": question})
+        _conversations[session_id].append({"role": "assistant", "content": answer})
+        # Keep last 20 messages (10 turns)
+        if len(_conversations[session_id]) > 20:
+            _conversations[session_id] = _conversations[session_id][-20:]
+
+    return jsonify({"answer": answer})
+
+
+@app.route("/api/query/clear", methods=["POST"])
+def api_query_clear():
+    data = request.get_json(force=True)
+    session_id = data.get("session_id", "default")
+    with _conversation_lock:
+        _conversations.pop(session_id, None)
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/overview")
+def api_overview():
+    return jsonify(get_overview())
+
+
+@app.route("/api/health")
+def api_health():
+    return jsonify(get_financial_health())
+
+
+@app.route("/api/comparison")
+def api_comparison():
+    year = request.args.get("year", "2026")
+    month = request.args.get("month", "07")
+    return jsonify(get_comparison(year, month))
+
+
+@app.route("/api/spending")
+def api_spending():
+    year = request.args.get("year", "all")
+    return jsonify(get_spending(year))
+
+
+@app.route("/api/spending/<category>")
+def api_spending_detail(category):
+    year = request.args.get("year", "all")
+    return jsonify(get_category_detail(category, year))
+
+
+@app.route("/api/monthly")
+def api_monthly():
+    return jsonify(get_monthly_trend())
+
+
+@app.route("/api/income")
+def api_income():
+    return jsonify(get_income_analysis())
+
+
+@app.route("/api/upload", methods=["POST"])
+def api_upload():
+    if "file" not in request.files:
+        return jsonify({"error": "请选择文件"}), 400
+    f = request.files["file"]
+    if not f.filename.endswith(".csv"):
+        return jsonify({"error": "仅支持 CSV 文件"}), 400
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    path = os.path.join(UPLOAD_DIR, f"raw_{ts}.csv")
+    f.save(path)
+    import csv
+    with open(path, "r", encoding="utf-8-sig") as fh:
+        reader = csv.DictReader(fh)
+        rows = list(reader)
+
+    # Run full pipeline: merge → DB sync → forecast refresh
+    pipeline_result = run_full_pipeline(path)
+
+    return jsonify({
+        "status": "ok",
+        "filename": f.filename,
+        "records": len(rows),
+        "saved_as": f"raw_{ts}.csv",
+        "pipeline": pipeline_result,
+    })
+
+
+@app.route("/api/forecast")
+def api_forecast():
+    data = load_json(FORECAST_FILE)
+    if data is None:
+        return jsonify({"error": "未生成预测结果，请先运行 prophet_forecast.py"}), 404
+    result = []
+    for r in data:
+        result.append({
+            "month": r["月份"],
+            "prediction": round(float(r["预测值"]), 2),
+            "lower": round(float(r["下限(80%)"]), 2),
+            "upper": round(float(r["上限(80%)"]), 2),
+        })
+    total = sum(item["prediction"] for item in result)
+    return jsonify({"data": result, "annual_total": round(total, 2)})
+
+
+@app.route("/api/history")
+def api_history():
+    data = load_monthly_json()
+    if data is None:
+        return jsonify([])
+    return jsonify(data)
+
+
+@app.route("/api/assets", methods=["GET", "PUT"])
+def api_assets():
+    if request.method == "PUT":
+        data = request.get_json(force=True)
+        update_assets(data)
+        return jsonify({"status": "ok"})
+    return jsonify(get_overview())
+
+
+@app.route("/api/assets/history")
+def api_asset_history():
+    return jsonify(get_asset_history())
+
+
+@app.route("/api/forecast/refresh", methods=["POST"])
+def api_refresh_forecast():
+    result = run_forecast_only()
+    return jsonify(result)
+
+
+@app.route("/api/portfolio")
+def api_portfolio():
+    return jsonify(get_portfolio())
+
+
+@app.route("/api/spending/seasonal")
+def api_seasonal():
+    return jsonify(get_seasonal_patterns())
+
+
+@app.route("/api/budget", methods=["GET", "PUT"])
+def api_budget():
+    if request.method == "PUT":
+        data = request.get_json(force=True)
+        update_budget(data)
+        return jsonify({"status": "ok"})
+    month = request.args.get("month")
+    return jsonify(get_budget_status(month))
+
+
+@app.route("/api/report/monthly")
+def api_monthly_report():
+    month = request.args.get("month")
+    return jsonify(get_monthly_report(month))
+
+
+@app.route("/api/report/annual")
+def api_annual_report():
+    year = request.args.get("year")
+    return jsonify(get_annual_report(year))
+
+
+@app.route("/api/forecast/backtest")
+def api_forecast_backtest():
+    from utils.data_loader import get_forecast_backtest
+    return jsonify(get_forecast_backtest())
+
+
+@app.route("/api/budget/check", methods=["POST"])
+def api_budget_check():
+    """Real-time budget overspend check for a category + amount."""
+    data = request.get_json(force=True)
+    category = data.get("category", "")
+    amount = float(data.get("amount", 0))
+    month = data.get("month")
+    if not month:
+        from datetime import datetime
+        month = datetime.now().strftime("%Y-%m")
+
+    bd = get_budget_status(month)
+    for item in bd["items"]:
+        if item["category"] == category:
+            new_ratio = (item["actual"] + amount) / item["budget"] * 100 if item["budget"] else 0
+            return jsonify({
+                "category": category,
+                "current_actual": float(item["actual"]),
+                "budget": float(item["budget"]),
+                "current_ratio": float(item["ratio"]),
+                "new_ratio": round(float(new_ratio), 1),
+                "would_overspend": bool(new_ratio >= 100),
+                "would_warn": bool(new_ratio >= 80),
+            })
+    return jsonify({"category": category, "budget": 0, "would_overspend": False, "would_warn": False})
+
+
+def _monthly_income():
+    return 16000 + 10610 / 3
+
+
+def _forward_project(balance, monthly_net, annual_rate, years):
+    projection = []
+    for y in range(1, years + 1):
+        for _ in range(12):
+            balance += monthly_net
+            balance *= (1 + annual_rate / 100 / 12)
+        projection.append({"year": y, "net_worth": round(balance, 2)})
+    return projection, round(balance, 2)
+
+
+@app.route("/api/simulation")
+def api_simulation():
+    expense_str = request.args.get("expense", "9622")
+    rate_str = request.args.get("rate", "5")
+    years_str = request.args.get("years", "10")
+
+    monthly_expense = float(expense_str)
+    annual_rate = float(rate_str)
+    years = int(years_str)
+    monthly_income = _monthly_income()
+    monthly_net = monthly_income - monthly_expense
+
+    overview = get_overview()
+    balance = overview["net_worth"]
+    projection, final = _forward_project(balance, monthly_net, annual_rate, years)
+
+    return jsonify({
+        "monthly_income": round(monthly_income, 2),
+        "monthly_expense": monthly_expense,
+        "monthly_net": round(monthly_net, 2),
+        "initial_net_worth": overview["net_worth"],
+        "projection": projection,
+        "final_net_worth": final,
+    })
+
+
+# ---- Reverse Calculation（目标→所需参数） ----
+
+def _pmt_needed(fv, pv, r, n):
+    """每月需存入金额（r 为月利率）"""
+    if r == 0:
+        return (fv - pv) / n
+    return (fv - pv * (1 + r) ** n) * r / ((1 + r) ** n - 1)
+
+
+def _nper_needed(fv, pv, pmt, r):
+    """达到目标需要的月数（r 为月利率）"""
+    if pmt < 0:
+        return 0
+    if r == 0:
+        return (fv - pv) / pmt if pmt > 0 else 0
+    return math.log((fv * r + pmt) / (pv * r + pmt)) / math.log(1 + r)
+
+
+def _rate_needed(fv, pv, pmt, n, guess=0.005):
+    """用牛顿法求解月利率"""
+    r = guess
+    for _ in range(100):
+        f = pv * (1 + r) ** n + pmt * ((1 + r) ** n - 1) / r - fv
+        df = n * pv * (1 + r) ** (n - 1) + pmt * (n * r * (1 + r) ** (n - 1) - (1 + r) ** n + 1) / (r * r)
+        if abs(df) < 1e-12:
+            break
+        r_new = r - f / df
+        if abs(r_new - r) < 1e-10:
+            break
+        r = r_new
+    return r
+
+
+@app.route("/api/calculate/target")
+def api_calc_target():
+    """给定目标金额、年数、年化 → 每月需存多少"""
+    target = float(request.args.get("target", "500000"))
+    years = int(request.args.get("years", "10"))
+    rate = float(request.args.get("rate", "5"))
+    overview = get_overview()
+
+    pv = overview["net_worth"]
+    n = years * 12
+    r = rate / 100 / 12
+    pmt = _pmt_needed(target, pv, r, n)
+
+    # 也给出对应的月支出
+    monthly_income = _monthly_income()
+    return jsonify({
+        "target": round(target, 2),
+        "years": years,
+        "annual_rate": rate,
+        "current_net_worth": round(pv, 2),
+        "required_monthly_save": round(pmt, 2),
+        "implied_monthly_expense": round(monthly_income - pmt, 2),
+    })
+
+
+@app.route("/api/calculate/years")
+def api_calc_years():
+    """给定目标金额、月存、年化 → 需要多少年"""
+    target = float(request.args.get("target", "500000"))
+    monthly_save = float(request.args.get("save", "8000"))
+    rate = float(request.args.get("rate", "5"))
+    overview = get_overview()
+
+    pv = overview["net_worth"]
+    r = rate / 100 / 12
+    n = _nper_needed(target, pv, monthly_save, r)
+    return jsonify({
+        "target": round(target, 2),
+        "monthly_save": monthly_save,
+        "annual_rate": rate,
+        "current_net_worth": round(pv, 2),
+        "years": round(n / 12, 1),
+        "months": round(n),
+    })
+
+
+@app.route("/api/calculate/rate")
+def api_calc_rate():
+    """给定目标金额、月存、年数 → 需要多高的年化收益"""
+    target = float(request.args.get("target", "500000"))
+    monthly_save = float(request.args.get("save", "8000"))
+    years = int(request.args.get("years", "10"))
+    overview = get_overview()
+
+    pv = overview["net_worth"]
+    n = years * 12
+    r = _rate_needed(target, pv, monthly_save, n)
+    return jsonify({
+        "target": round(target, 2),
+        "monthly_save": monthly_save,
+        "years": years,
+        "current_net_worth": round(pv, 2),
+        "annual_rate": round(r * 12 * 100, 2),
+    })
+
+
+# ---- DB Migration ----
+
+# ---- LLM Config ----
+
+@app.route("/api/llm/config", methods=["GET", "POST"])
+def api_llm_config():
+    if request.method == "POST":
+        data = request.get_json(force=True)
+        llm.save_config({
+            "api_key": data.get("api_key", ""),
+            "base_url": data.get("base_url", "https://api.deepseek.com"),
+            "model": data.get("model", "deepseek-v4-flash"),
+        })
+        return jsonify({"success": True})
+    cfg = llm.load_config()
+    return jsonify({
+        "configured": bool(cfg.get("api_key")),
+        "base_url": cfg.get("base_url", ""),
+        "model": cfg.get("model", ""),
+    })
+
+
+@app.route("/api/db/status")
+def api_db_status():
+    return jsonify({
+        "migrated": db.is_migrated(),
+        "stats": db.get_table_stats() if db.is_migrated() else None,
+    })
+
+
+@app.route("/api/db/migrate", methods=["POST"])
+def api_db_migrate():
+    from config import V4_FILE
+    try:
+        db.init_db()
+        count = db.migrate_from_csv(V4_FILE)
+        stats = db.get_table_stats()
+        return jsonify({"success": True, "records": count, "stats": stats})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/db/rollback", methods=["POST"])
+def api_db_rollback():
+    import os
+    if DB_PATH and os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
+        return jsonify({"success": True})
+    return jsonify({"success": False, "error": "no database to rollback"}), 400
+
+
+# ---- Alerts ----
+
+@app.route("/api/alerts")
+def api_alerts():
+    return jsonify(get_alerts())
+
+
+@app.route("/api/alerts/poll")
+def api_poll_alerts():
+    """Frontend polls this to check for new unresolved alerts."""
+    from utils.data_loader import get_alerts
+    alerts = get_alerts()
+    unresolved = [a for a in alerts if not a.get("resolved")]
+    return jsonify({"new_count": len(unresolved), "alerts": unresolved})
+
+
+@app.route("/api/alerts/<alert_id>/resolve", methods=["POST"])
+def api_resolve_alert(alert_id):
+    return jsonify(resolve_alert(alert_id))
+
+
+# ---- Goals ----
+
+@app.route("/api/goals", methods=["GET", "POST"])
+def api_goals():
+    if request.method == "POST":
+        data = request.get_json(force=True)
+        return jsonify(create_goal(data))
+    return jsonify(get_goals())
+
+
+@app.route("/api/goals/<goal_id>", methods=["PUT", "DELETE"])
+def api_goal_detail(goal_id):
+    if request.method == "DELETE":
+        return jsonify(delete_goal(goal_id))
+    data = request.get_json(force=True)
+    return jsonify(update_goal(goal_id, data))
+
+
+# ---- Auth ----
+
+@app.route("/api/auth/login", methods=["POST"])
+def api_login():
+    data = request.get_json(force=True)
+    pwd = data.get("password", "")
+    client_ip = request.remote_addr or "unknown"
+    token, error = login(pwd, ip=client_ip)
+    if token:
+        return jsonify({"token": token})
+    return jsonify({"error": error or "密码错误"}), 401
+
+
+@app.route("/api/auth/status")
+def api_auth_status():
+    if require_auth() is None:
+        return jsonify({"authenticated": True, "configurable": False})
+    token = request.headers.get("X-Auth-Token", "")
+    if not token:
+        return jsonify({"authenticated": False, "configurable": True})
+    return jsonify({"authenticated": check_token(token), "configurable": True})
+
+
+# ---- Serve frontend ----
+
+@app.route("/")
+def index():
+    return serve_frontend("index.html")
+
+
+@app.route("/<path:path>")
+def static_proxy(path):
+    if path.startswith("api/"):
+        return jsonify({"error": "not found"}), 404
+    return serve_frontend(path)
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    print(f"Server starting at http://localhost:{port}")
+    app.run(host="0.0.0.0", port=port, debug=True)

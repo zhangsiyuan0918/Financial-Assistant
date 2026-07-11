@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+*.suo
+
+# Sensitive files
+backend/llm_config.json
+backend/data/.llm_key
+backend/data/auth.json
+backend/data/auth_tokens.json
+
+# Data files (user-specific)
+backend/data/uploads/
+backend/data/*.db
+backend/data/资产设置.json
+backend/data/预算设置.json
+backend/data/预警记录.json
+backend/data/目标设置.json
+backend/data/月度资产快照.csv
