@@ -11,11 +11,21 @@
     </template>
 
     <!-- 常用模板快捷按钮 -->
-    <div v-if="templates.length" style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">
-      <button v-for="t in templates" :key="t.id" @click="applyTpl(t)"
-        style="padding:4px 10px;background:#f0f9eb;color:#67c23a;border:1px solid #b3e19d;border-radius:4px;cursor:pointer;font-size:12px">
-        {{ t.name }} ¥{{ t.amount.toLocaleString() }}
-      </button>
+    <div v-if="templates.length" style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <div v-for="t in templates" :key="t.id" style="display:flex;align-items:center;gap:2px">
+        <button @click="applyTpl(t)"
+          style="padding:4px 10px;background:#f0f9eb;color:#67c23a;border:1px solid #b3e19d;border-radius:4px;cursor:pointer;font-size:12px">
+          {{ t.name }} ¥{{ t.amount.toLocaleString() }}
+        </button>
+        <button @click="editTpl(t)" title="编辑"
+          style="padding:2px 4px;background:none;color:#909399;border:none;cursor:pointer;font-size:11px">
+          ✎
+        </button>
+        <button @click="removeTpl(t.id)" title="删除"
+          style="padding:2px 4px;background:none;color:#f56c6c;border:none;cursor:pointer;font-size:11px">
+          ×
+        </button>
+      </div>
     </div>
 
     <!-- 创建模板表单 -->
@@ -203,7 +213,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { fetchTransactions, fetchCreditCard, payCreditCard, addTransactionApi, deleteTransactionApi, fetchCurrentAnalysis, fetchAccountsApi, suggestCategory, fetchTemplates, createTemplate, applyTemplate as applyTemplateApi } from '../api/index.js'
+import { fetchTransactions, fetchCreditCard, payCreditCard, addTransactionApi, deleteTransactionApi, fetchCurrentAnalysis, fetchAccountsApi, suggestCategory, fetchTemplates, createTemplate, deleteTemplate, applyTemplate as applyTemplateApi } from '../api/index.js'
 
 const emit = defineEmits(['recorded', 'deleted'])
 
@@ -238,6 +248,7 @@ let suggestTimer = null
 const templates = ref([])
 const showTemplateForm = ref(false)
 const tplForm = ref({ name: '', amount: null, category: '', type: '支出' })
+const editingTplId = ref(null)
 
 async function submit() {
   if (!form.value.amount || !form.value.category) return
@@ -320,13 +331,34 @@ async function loadTemplates() {
 
 async function saveTpl() {
   try {
+    if (editingTplId.value) {
+      // 编辑模式：先删后建
+      await deleteTemplate(editingTplId.value)
+      editingTplId.value = null
+    }
     await createTemplate(tplForm.value)
-    ElMessage.success('模板已保存')
+    ElMessage.success(editingTplId.value ? '模板已更新' : '模板已保存')
     tplForm.value = { name: '', amount: null, category: '', type: '支出' }
     showTemplateForm.value = false
     loadTemplates()
   } catch (e) {
     ElMessage.error('保存失败')
+  }
+}
+
+function editTpl(t) {
+  tplForm.value = { name: t.name, amount: t.amount, category: t.category, type: t.type }
+  editingTplId.value = t.id
+  showTemplateForm.value = true
+}
+
+async function removeTpl(id) {
+  try {
+    await deleteTemplate(id)
+    ElMessage.success('已删除')
+    loadTemplates()
+  } catch (e) {
+    ElMessage.error('删除失败')
   }
 }
 
