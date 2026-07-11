@@ -317,7 +317,16 @@ def api_spending():
 
 @app.route("/api/spending/habits")
 def api_spending_habits():
-    """消费习惯分析"""
+    """消费习惯分析（使用缓存的AI洞察）"""
+    return jsonify(get_spending_habits())
+
+
+@app.route("/api/spending/habits/refresh-ai", methods=["POST"])
+def api_refresh_ai_insights():
+    """强制刷新AI洞察（清除缓存）"""
+    from utils.data_loader import _ai_insights_cache, get_spending_habits
+    _ai_insights_cache["data"] = None
+    _ai_insights_cache["timestamp"] = 0
     return jsonify(get_spending_habits())
 
 

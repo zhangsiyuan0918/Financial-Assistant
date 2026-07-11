@@ -1792,6 +1792,10 @@ def get_category_stats():
 
 # ===================== 消费习惯分析 =====================
 
+# AI 洞察缓存
+_ai_insights_cache = {"data": None, "timestamp": 0, "tx_count": 0}
+
+
 def get_spending_habits():
     """
     综合消费习惯分析，返回多维度洞察。
@@ -1824,9 +1828,31 @@ def get_spending_habits():
     # 6. 消费集中度（TOP3分类占比）
     result["concentration"] = _analyze_concentration(expense, current_month)
 
-    # 7. AI 智能洞察
-    result["ai_insights"] = _generate_ai_insights(result, expense, current_month)
+    # 7. AI 智能洞察（使用缓存）
+    result["ai_insights"] = _get_cached_ai_insights(result, expense, current_month)
 
+    return result
+
+
+def _get_cached_ai_insights(habits, expense, current_month):
+    """带缓存的 AI 洞察生成"""
+    from datetime import datetime
+    now = datetime.now()
+    tx_count = len(expense)
+
+    # 检查缓存：24小时内 且 数据变化不超过5笔
+    cache = _ai_insights_cache
+    hours_since = (now.timestamp() - cache["timestamp"]) / 3600
+    tx_changed = abs(tx_count - cache["tx_count"])
+
+    if cache["data"] and hours_since < 24 and tx_changed <= 5:
+        return cache["data"]
+
+    # 缓存过期或数据变化大，重新生成
+    result = _generate_ai_insights(habits, expense, current_month)
+    _ai_insights_cache["data"] = result
+    _ai_insights_cache["timestamp"] = now.timestamp()
+    _ai_insights_cache["tx_count"] = tx_count
     return result
 
 
