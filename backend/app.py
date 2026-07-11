@@ -695,13 +695,11 @@ def api_goal_detail(goal_id):
 
 # ---- Templates ----
 
-@app.route("/api/templates")
-def api_list_templates():
-    return jsonify(get_templates())
-
-
-@app.route("/api/templates", methods=["POST"])
-def api_create_template():
+@app.route("/api/templates", methods=["GET", "POST"])
+def api_templates():
+    if request.method == "GET":
+        return jsonify(get_templates())
+    # POST - 创建模板
     data = request.get_json(force=True)
     name = data.get("name")
     amount = data.get("amount")
