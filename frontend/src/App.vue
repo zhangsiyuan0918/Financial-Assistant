@@ -2,7 +2,7 @@
   <el-container style="min-height: 100vh">
     <el-aside :width="isMobile ? '0px' : '220px'" :class="{ 'mobile-hidden': isMobile }">
       <div class="sidebar-logo">
-        <span style="font-size:18px;font-weight:bold">💰 财务分析</span>
+        <span style="font-size:18px;font-weight:bold">FinFlow</span>
       </div>
       <el-menu
         :default-active="route.path"
