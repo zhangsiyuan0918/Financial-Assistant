@@ -3,9 +3,10 @@
     <template #header>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:14px;font-weight:bold">记一笔</span>
-        <el-button size="small" text @click="showTemplateForm = !showTemplateForm">
+        <button @click="showTemplateForm = !showTemplateForm"
+          style="padding:4px 10px;background:none;color:#409eff;border:1px solid #b3d8ff;border-radius:3px;cursor:pointer;font-size:12px">
           {{ showTemplateForm ? '关闭' : '+ 添加模板' }}
-        </el-button>
+        </button>
       </div>
     </template>
 
@@ -35,9 +36,10 @@
           </el-select>
         </el-col>
         <el-col :span="3">
-          <el-button size="small" type="primary" @click="saveTpl" :disabled="!tplForm.name || !tplForm.amount || !tplForm.category">
+          <button @click="saveTpl" :disabled="!tplForm.name || !tplForm.amount || !tplForm.category"
+            style="padding:4px 12px;background:#409eff;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:12px">
             保存
-          </el-button>
+          </button>
         </el-col>
       </el-row>
     </div>
