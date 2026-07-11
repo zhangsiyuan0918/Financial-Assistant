@@ -93,3 +93,4 @@ export function pollAlerts() { return api.get('/alerts/poll').then(r => r.data) 
 export function fetchAnnualReport(year) { return api.get('/report/annual', { params: { year } }).then(r => r.data) }
 export function fetchForecastBacktest() { return api.get('/forecast/backtest').then(r => r.data) }
 export function checkBudget(data) { return api.post('/budget/check', data).then(r => r.data) }
+export function fetchTransactions(month) { return api.get('/transactions', { params: { month } }).then(r => r.data) }

@@ -127,6 +127,18 @@ def api_add_transaction():
     return jsonify(result)
 
 
+@app.route("/api/transactions")
+def api_list_transactions():
+    from utils.data_loader import _load_transactions
+    month = request.args.get("month")
+    txs = _load_transactions()
+    if month:
+        txs = [t for t in txs if t["date"][:7] == month]
+    # 按日期倒序
+    txs.sort(key=lambda t: t["date"], reverse=True)
+    return jsonify(txs)
+
+
 @app.route("/api/health")
 def api_health():
     return jsonify(get_financial_health())

@@ -1,26 +1,31 @@
 <template>
   <el-card class="quick-entry">
     <template #header>
-      <el-space>
-        <span style="font-size:14px;font-weight:bold">记一笔</span>
-        <el-tag size="small" type="success">实时分析</el-tag>
-      </el-space>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <el-space>
+          <span style="font-size:14px;font-weight:bold">记一笔</span>
+          <el-tag size="small" type="success">实时分析</el-tag>
+        </el-space>
+        <el-button size="small" text @click="showHistory = !showHistory">
+          {{ showHistory ? '收起' : '历史记录' }}
+        </el-button>
+      </div>
     </template>
 
     <el-form :model="form" inline size="default">
       <el-form-item label="日期">
-        <el-date-picker v-model="form.date" type="date" value-format="YYYY-MM-DD" style="width:140px" :shortcuts="dateShortcuts" />
+        <el-date-picker v-model="form.date" type="date" value-format="YYYY-MM-DD" style="width:130px" :shortcuts="dateShortcuts" />
       </el-form-item>
       <el-form-item label="金额">
-        <el-input-number v-model="form.amount" :min="0.01" :step="10" :precision="2" style="width:130px" placeholder="0.00" />
+        <el-input-number v-model="form.amount" :min="0.01" :step="10" :precision="2" style="width:120px" placeholder="0.00" />
       </el-form-item>
       <el-form-item label="分类">
-        <el-select v-model="form.category" style="width:110px" placeholder="分类">
+        <el-select v-model="form.category" style="width:100px" placeholder="分类">
           <el-option v-for="cat in categories" :key="cat" :label="cat" :value="cat" />
         </el-select>
       </el-form-item>
       <el-form-item label="备注">
-        <el-input v-model="form.note" style="width:130px" placeholder="可选" clearable />
+        <el-input v-model="form.note" style="width:120px" placeholder="可选" clearable />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="submit" :loading="loading" :disabled="!form.amount || !form.category">
@@ -37,14 +42,12 @@
         <span style="font-size:12px;color:#999">{{ analysis.month_summary.month }} · {{ analysis.month_summary.count }}笔</span>
       </div>
 
-      <!-- 建议 -->
       <div v-if="analysis.suggestions.length" class="suggestions">
         <div v-for="(s, i) in analysis.suggestions" :key="i" style="font-size:12px;padding:2px 0;color:#e6a23c">
           {{ s }}
         </div>
       </div>
 
-      <!-- 总支出进度 -->
       <div class="budget-bar">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
           <span>本月支出 ¥{{ analysis.month_summary.total.toLocaleString() }}</span>
@@ -54,25 +57,38 @@
           :color="analysis.budget.total_ratio > 100 ? '#f56c6c' : analysis.budget.total_ratio > 80 ? '#e6a23c' : '#67c23a'" />
       </div>
 
-      <!-- 分类明细（前3） -->
       <div class="category-list">
-        <div v-for="(item, i) in analysis.budget.items.slice(0, 3)" :key="item.category" class="category-item">
-          <span style="font-size:12px;color:#666">{{ item.category }}</span>
-          <el-progress :percentage="Math.min(item.ratio, 100)" :stroke-width="6" style="flex:1;margin:0 8px"
+        <div v-for="item in analysis.budget.items.slice(0, 3)" :key="item.category" class="category-item">
+          <span style="font-size:12px;color:#666;width:48px">{{ item.category }}</span>
+          <el-progress :percentage="Math.min(item.ratio, 100)" :stroke-width="6" style="flex:1;margin:0 6px"
             :color="item.ratio > 100 ? '#f56c6c' : item.ratio > 80 ? '#e6a23c' : '#409eff'" />
           <span style="font-size:11px;color:#999;width:80px;text-align:right">
             ¥{{ item.spent.toLocaleString() }}/{{ item.budget.toLocaleString() }}
           </span>
         </div>
       </div>
+    </div>
 
-      <!-- 最近5笔 -->
-      <div v-if="analysis.recent_5.length" class="recent-list">
-        <div style="font-size:12px;color:#999;margin-bottom:4px">最近记录</div>
-        <div v-for="tx in analysis.recent_5.slice().reverse()" :key="tx.date + tx.amount"
-          style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid #f5f5f5">
-          <span>{{ tx.category }} {{ tx.note ? '- ' + tx.note : '' }}</span>
-          <span style="color:#f56c6c">-¥{{ tx.amount.toLocaleString() }}</span>
+    <!-- 历史记录 -->
+    <div v-if="showHistory" class="history-section">
+      <el-divider style="margin:8px 0" />
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-weight:bold;font-size:13px">历史记录</span>
+        <el-select v-model="historyMonth" size="small" style="width:120px" @change="loadHistory">
+          <el-option label="全部" value="" />
+          <el-option v-for="m in historyMonths" :key="m" :label="m" :value="m" />
+        </el-select>
+      </div>
+      <div v-if="historyLoading" style="text-align:center;color:#999;padding:12px">加载中...</div>
+      <div v-else-if="!historyList.length" style="text-align:center;color:#999;padding:12px">暂无记录</div>
+      <div v-else class="history-list">
+        <div v-for="(tx, i) in historyList" :key="i" class="history-item">
+          <div style="flex:1">
+            <span style="font-size:13px">{{ tx.category }}</span>
+            <span v-if="tx.note" style="font-size:12px;color:#999;margin-left:6px">{{ tx.note }}</span>
+          </div>
+          <span style="font-size:12px;color:#999;margin-right:12px">{{ tx.date }}</span>
+          <span style="font-size:13px;color:#f56c6c;font-weight:500">-¥{{ Number(tx.amount).toLocaleString() }}</span>
         </div>
       </div>
     </div>
@@ -80,8 +96,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { fetchTransactions } from '../api/index.js'
 
 const emit = defineEmits(['recorded'])
 
@@ -99,6 +116,11 @@ const dateShortcuts = [
 const form = ref({ date: today(), amount: null, category: '', note: '' })
 const loading = ref(false)
 const analysis = ref(null)
+const showHistory = ref(false)
+const historyList = ref([])
+const historyMonths = ref([])
+const historyMonth = ref('')
+const historyLoading = ref(false)
 
 async function submit() {
   if (!form.value.amount || !form.value.category) return
@@ -119,14 +141,35 @@ async function submit() {
     ElMessage.success('记账成功')
     emit('recorded', res)
 
-    // 重置表单
     form.value = { date: today(), amount: null, note: '', category: '' }
+
+    if (showHistory.value) loadHistory()
   } catch (e) {
     ElMessage.error('记账失败')
   } finally {
     loading.value = false
   }
 }
+
+async function loadHistory() {
+  historyLoading.value = true
+  try {
+    const txs = await fetchTransactions(historyMonth.value || undefined)
+    historyList.value = txs
+    // 提取可用月份
+    if (!historyMonths.value.length) {
+      const allTxs = await fetchTransactions()
+      const months = [...new Set(allTxs.map(t => t.date.slice(0, 7)))].sort().reverse()
+      historyMonths.value = months
+    }
+  } catch (e) {
+    historyList.value = []
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+onMounted(() => { loadHistory() })
 </script>
 
 <style scoped>
@@ -137,5 +180,7 @@ async function submit() {
 .budget-bar { margin-bottom: 8px; }
 .category-list { margin-bottom: 8px; }
 .category-item { display: flex; align-items: center; padding: 2px 0; }
-.recent-list { margin-top: 8px; }
+.history-list { max-height: 300px; overflow-y: auto; }
+.history-item { display: flex; align-items: center; padding: 6px 0; border-bottom: 1px solid #f5f5f5; }
+.history-item:last-child { border-bottom: none; }
 </style>
