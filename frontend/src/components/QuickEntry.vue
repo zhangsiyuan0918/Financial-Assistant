@@ -1,10 +1,10 @@
 <template>
-  <el-card class="finflow-quick-entry">
+  <el-card style="margin-bottom:12px">
     <template #header>
       <span style="font-size:14px;font-weight:bold">记一笔</span>
     </template>
 
-    <!-- 第一行：输入字段 -->
+    <!-- 输入字段 -->
     <el-row :gutter="8" align="middle">
       <el-col :span="3">
         <el-radio-group v-model="form.type" size="small" @change="form.category = ''">
@@ -33,35 +33,33 @@
       </el-col>
     </el-row>
 
-    <!-- 第二行：按钮 -->
-    <el-row :gutter="8" style="margin-top:8px">
-      <el-col :span="4">
-        <el-button type="primary" size="small" @click="submit" :loading="loading" :disabled="!form.amount || !form.category">
-          记账
-        </el-button>
-      </el-col>
-      <el-col :span="4">
-        <el-button size="small" @click="showHistory = !showHistory">
-          {{ showHistory ? '收起历史' : '查看历史记录' }}
-        </el-button>
-      </el-col>
-    </el-row>
+    <!-- 按钮行 -->
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <button @click="submit" :disabled="!form.amount || !form.category"
+        style="padding:8px 20px;background:#409eff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">
+        {{ loading ? '记账中...' : '记账' }}
+      </button>
+      <button @click="showHistory = !showHistory"
+        style="padding:8px 16px;background:#fff;color:#606266;border:1px solid #dcdfe6;border-radius:4px;cursor:pointer;font-size:13px">
+        {{ showHistory ? '收起历史' : '查看历史记录' }}
+      </button>
+    </div>
 
     <!-- 分析结果 -->
-    <div v-if="analysis" class="analysis-result">
+    <div v-if="analysis" style="margin-top:12px;font-size:13px">
       <el-divider style="margin:8px 0" />
-      <div class="analysis-header">
-        <span style="font-weight:bold;font-size:13px">本月分析</span>
-        <span style="font-size:12px;color:#999">{{ analysis.month_summary.month }} · {{ analysis.month_summary.count }}笔</span>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="font-weight:bold">本月分析</span>
+        <span style="color:#999">{{ analysis.month_summary.month }} · {{ analysis.month_summary.count }}笔</span>
       </div>
 
-      <div v-if="analysis.suggestions.length" class="suggestions">
-        <div v-for="(s, i) in analysis.suggestions" :key="i" style="font-size:12px;padding:2px 0;color:#e6a23c">
+      <div v-if="analysis.suggestions.length" style="margin-bottom:8px">
+        <div v-for="(s, i) in analysis.suggestions" :key="i" style="padding:2px 0;color:#e6a23c;font-size:12px">
           {{ s }}
         </div>
       </div>
 
-      <div class="budget-bar">
+      <div style="margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
           <span>本月支出 ¥{{ analysis.month_summary.total_expense.toLocaleString() }}</span>
           <span>预算 ¥{{ analysis.budget.total_budget.toLocaleString() }} ({{ analysis.budget.total_ratio }}%)</span>
@@ -70,12 +68,13 @@
           :color="analysis.budget.total_ratio > 100 ? '#f56c6c' : analysis.budget.total_ratio > 80 ? '#e6a23c' : '#67c23a'" />
       </div>
 
-      <div class="category-list">
-        <div v-for="item in analysis.budget.items.slice(0, 3)" :key="item.category" class="category-item">
-          <span style="font-size:12px;color:#666;width:48px">{{ item.category }}</span>
+      <div>
+        <div v-for="item in analysis.budget.items.slice(0, 3)" :key="item.category"
+          style="display:flex;align-items:center;padding:2px 0;font-size:12px">
+          <span style="color:#666;width:48px">{{ item.category }}</span>
           <el-progress :percentage="Math.min(item.ratio, 100)" :stroke-width="6" style="flex:1;margin:0 6px"
             :color="item.ratio > 100 ? '#f56c6c' : item.ratio > 80 ? '#e6a23c' : '#409eff'" />
-          <span style="font-size:11px;color:#999;width:80px;text-align:right">
+          <span style="color:#999;width:80px;text-align:right">
             ¥{{ item.spent.toLocaleString() }}/{{ item.budget.toLocaleString() }}
           </span>
         </div>
@@ -83,7 +82,7 @@
     </div>
 
     <!-- 历史记录 -->
-    <div v-if="showHistory" class="history-section">
+    <div v-if="showHistory" style="margin-top:12px">
       <el-divider style="margin:8px 0" />
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span style="font-weight:bold;font-size:13px">历史记录</span>
@@ -94,17 +93,21 @@
       </div>
       <div v-if="historyLoading" style="text-align:center;color:#999;padding:12px">加载中...</div>
       <div v-else-if="!historyList.length" style="text-align:center;color:#999;padding:12px">暂无记录</div>
-      <div v-else class="history-list">
-        <div v-for="(tx, i) in historyList" :key="i" class="history-item">
+      <div v-else style="max-height:300px;overflow-y:auto">
+        <div v-for="(tx, i) in historyList" :key="i"
+          style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:13px">
           <div style="flex:1">
-            <span style="font-size:13px">{{ tx.category }}</span>
-            <span v-if="tx.note" style="font-size:12px;color:#999;margin-left:6px">{{ tx.note }}</span>
+            <span>{{ tx.category }}</span>
+            <span v-if="tx.note" style="color:#999;margin-left:6px;font-size:12px">{{ tx.note }}</span>
           </div>
-          <span style="font-size:12px;color:#999;margin-right:8px">{{ tx.date }}</span>
-          <span :style="{fontSize:'13px',fontWeight:500,marginRight:'8px',color: tx.type === '收入' ? '#67c23a' : '#f56c6c'}">
+          <span style="color:#999;margin-right:8px;font-size:12px">{{ tx.date }}</span>
+          <span :style="{fontWeight:500,marginRight:'8px',color: tx.type === '收入' ? '#67c23a' : '#f56c6c'}">
             {{ tx.type === '收入' ? '+' : '-' }}¥{{ Number(tx.amount).toLocaleString() }}
           </span>
-          <el-button size="small" type="danger" text @click="deleteTx(tx)">删除</el-button>
+          <button @click="deleteTx(tx)"
+            style="padding:2px 8px;background:none;color:#f56c6c;border:1px solid #f56c6c;border-radius:3px;cursor:pointer;font-size:11px">
+            删除
+          </button>
         </div>
       </div>
     </div>
@@ -205,18 +208,3 @@ onMounted(async () => {
   } catch {}
 })
 </script>
-
-<!-- 使用唯一前缀避免全局样式冲突 -->
-<style>
-.finflow-quick-entry { margin-bottom: 12px; }
-.finflow-quick-entry .el-card__header { overflow: visible; }
-.finflow-quick-entry .analysis-result { font-size: 13px; }
-.finflow-quick-entry .analysis-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
-.finflow-quick-entry .suggestions { margin-bottom: 8px; }
-.finflow-quick-entry .budget-bar { margin-bottom: 8px; }
-.finflow-quick-entry .category-list { margin-bottom: 8px; }
-.finflow-quick-entry .category-item { display: flex; align-items: center; padding: 2px 0; }
-.finflow-quick-entry .history-list { max-height: 300px; overflow-y: auto; }
-.finflow-quick-entry .history-item { display: flex; align-items: center; padding: 6px 0; border-bottom: 1px solid #f5f5f5; }
-.finflow-quick-entry .history-item:last-child { border-bottom: none; }
-</style>
