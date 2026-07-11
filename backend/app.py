@@ -208,6 +208,13 @@ def api_asset_history():
     return jsonify(get_asset_history())
 
 
+@app.route("/api/assets/backfill", methods=["POST"])
+def api_backfill_assets():
+    from utils.data_loader import backfill_asset_history
+    result = backfill_asset_history()
+    return jsonify(result)
+
+
 @app.route("/api/forecast/refresh", methods=["POST"])
 def api_refresh_forecast():
     result = run_forecast_only()

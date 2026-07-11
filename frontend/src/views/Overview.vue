@@ -124,6 +124,7 @@
       <template #header><span style="font-size:14px">数据管理</span></template>
       <el-space wrap>
         <el-button size="small" type="primary" plain @click="uploadVisible = true">导入 CSV</el-button>
+        <el-button size="small" type="success" plain @click="doBackfill" :loading="backfilling">回填历史净值</el-button>
         <el-tag v-if="dbStatus.migrated" type="success" size="small">SQLite</el-tag>
         <el-tag v-else type="info" size="small">CSV</el-tag>
         <span v-if="dbStatus.stats" style="font-size:12px;color:#999">
@@ -189,7 +190,7 @@
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
-import { fetchOverview, fetchAssetHistory, fetchBudget, updateAssets, updateBudget, uploadCsv, fetchHealth, fetchDbStatus, migrateDb, rollbackDb, fetchAlerts } from '../api/index.js'
+import { fetchOverview, fetchAssetHistory, fetchBudget, updateAssets, updateBudget, uploadCsv, fetchHealth, fetchDbStatus, migrateDb, rollbackDb, fetchAlerts, backfillAssets } from '../api/index.js'
 import AiFloat from '../components/AiFloat.vue'
 import { createChart } from '../utils/chart.js'
 
@@ -209,6 +210,7 @@ const budgetEditForm = ref([])
 const uploadVisible = ref(false)
 const uploadResult = ref(null)
 const uploading = ref(false)
+const backfilling = ref(false)
 const layers = ['现金/活期', '投资资产', '受限资产', '应收']
 const fmt = v => '¥' + Number(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 
@@ -265,6 +267,19 @@ async function handleUpload(file) {
     uploadResult.value = null
   } finally {
     uploading.value = false
+  }
+}
+
+async function doBackfill() {
+  backfilling.value = true
+  try {
+    await backfillAssets()
+    assetHistory.value = await fetchAssetHistory()
+    ElMessage.success('历史净值已回填')
+  } catch {
+    ElMessage.error('回填失败')
+  } finally {
+    backfilling.value = false
   }
 }
 

@@ -31,6 +31,7 @@ export function fetchIncome() { return api.get('/income').then(r => r.data) }
 export function fetchForecast() { return api.get('/forecast').then(r => r.data) }
 export function fetchHistory() { return api.get('/history').then(r => r.data) }
 export function fetchAssetHistory() { return api.get('/assets/history').then(r => r.data) }
+export function backfillAssets() { return api.post('/assets/backfill').then(r => r.data) }
 export function fetchSimulation(params) {
   return api.get('/simulation', { params }).then(r => r.data)
 }
