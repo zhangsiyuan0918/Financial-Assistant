@@ -100,3 +100,4 @@ export function addTransactionApi(data) { return api.post('/transaction', data).
 export function deleteTransactionApi(txId) { return api.delete(`/transaction/${txId}`).then(r => r.data) }
 export function fetchCurrentAnalysis() { return api.get('/analysis/current').then(r => r.data) }
 export function fetchAccountsApi() { return api.get('/accounts').then(r => r.data) }
+export function suggestCategory(text) { return api.get('/suggest-category', { params: { text } }).then(r => r.data) }

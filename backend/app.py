@@ -9,7 +9,7 @@ from auth import login, check_token, require_auth
 from utils import db, llm
 db.set_db_path(DB_PATH)
 from utils.query_engine import QueryEngine
-from utils.data_loader import get_overview, get_spending, get_monthly_trend, get_category_detail, get_income_analysis, get_asset_history, get_portfolio, get_seasonal_patterns, get_budget_status, get_monthly_report, update_assets, update_budget, get_alerts, resolve_alert, get_goals, create_goal, update_goal, delete_goal, get_financial_health, get_comparison, get_annual_report, add_transaction, delete_transaction, get_quick_stats, pay_credit_card, get_credit_card_status
+from utils.data_loader import get_overview, get_spending, get_monthly_trend, get_category_detail, get_income_analysis, get_asset_history, get_portfolio, get_seasonal_patterns, get_budget_status, get_monthly_report, update_assets, update_budget, get_alerts, resolve_alert, get_goals, create_goal, update_goal, delete_goal, get_financial_health, get_comparison, get_annual_report, add_transaction, delete_transaction, get_quick_stats, pay_credit_card, get_credit_card_status, suggest_category
 from utils.pipeline import run_full_pipeline, run_forecast_only
 
 app = Flask(__name__, static_folder=None)
@@ -234,6 +234,14 @@ def api_list_accounts():
     used = list(set(t.get("account", "") for t in txs if t.get("account")))
     accounts = list(dict.fromkeys(DEFAULT_ACCOUNTS + used))
     return jsonify(accounts)
+
+
+@app.route("/api/suggest-category")
+def api_suggest_category():
+    """根据输入文本推荐分类"""
+    text = request.args.get("text", "")
+    suggestions = suggest_category(text)
+    return jsonify(suggestions)
 
 
 @app.route("/api/credit-card")

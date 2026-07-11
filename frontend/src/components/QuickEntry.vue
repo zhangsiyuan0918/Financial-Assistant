@@ -29,9 +29,20 @@
         </el-select>
       </el-col>
       <el-col :span="5">
-        <el-input v-model="form.note" size="small" placeholder="备注" clearable />
+        <el-input v-model="form.note" size="small" placeholder="备注（输入后自动推荐分类）" clearable
+          @input="onNoteInput" />
       </el-col>
     </el-row>
+
+    <!-- 智能分类推荐 -->
+    <div v-if="suggestions.length && !form.category" style="margin-top:6px;display:flex;gap:6px;align-items:center">
+      <span style="font-size:11px;color:#999">推荐：</span>
+      <button v-for="s in suggestions" :key="s.category" @click="form.category = s.category"
+        style="padding:2px 8px;background:#f0f9eb;color:#67c23a;border:1px solid #b3e19d;border-radius:3px;cursor:pointer;font-size:11px">
+        {{ s.category }}
+        <span style="color:#999;font-size:10px">({{ Math.round(s.confidence * 100) }}%)</span>
+      </button>
+    </div>
 
     <!-- 按钮行 -->
     <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
@@ -152,7 +163,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { fetchTransactions, fetchCreditCard, payCreditCard, addTransactionApi, deleteTransactionApi, fetchCurrentAnalysis, fetchAccountsApi } from '../api/index.js'
+import { fetchTransactions, fetchCreditCard, payCreditCard, addTransactionApi, deleteTransactionApi, fetchCurrentAnalysis, fetchAccountsApi, suggestCategory } from '../api/index.js'
 
 const emit = defineEmits(['recorded', 'deleted'])
 
@@ -182,6 +193,8 @@ const creditCard = ref({ balance: 0, history: [] })
 const showPayCC = ref(false)
 const payAmount = ref(0)
 const payAccount = ref('招行储蓄卡')
+const suggestions = ref([])
+let suggestTimer = null
 
 async function submit() {
   if (!form.value.amount || !form.value.category) return
@@ -259,6 +272,22 @@ async function loadCreditCard() {
   try {
     creditCard.value = await fetchCreditCard()
   } catch {}
+}
+
+function onNoteInput() {
+  clearTimeout(suggestTimer)
+  const text = form.value.note
+  if (!text || text.length < 2) {
+    suggestions.value = []
+    return
+  }
+  suggestTimer = setTimeout(async () => {
+    try {
+      suggestions.value = await suggestCategory(text)
+    } catch {
+      suggestions.value = []
+    }
+  }, 300)
 }
 
 async function doPayCC() {

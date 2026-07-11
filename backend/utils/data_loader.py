@@ -1527,3 +1527,125 @@ def get_quick_stats():
         "count": len(month_txs),
         "by_category": {k: round(v, 2) for k, v in sorted(by_category.items(), key=lambda x: -x[1])},
     }
+
+
+# ===================== 智能分类推荐 =====================
+
+# 预置关键词映射（常见消费场景）
+_PRESET_CATEGORY_MAP = {
+    "餐饮": ["外卖", "餐厅", "吃饭", "午餐", "晚餐", "早餐", "奶茶", "咖啡", "火锅", "烧烤",
+             "麦当劳", "肯德基", "星巴克", "瑞幸", "沙县", "兰州", "面馆", "食堂", "小吃",
+             "必胜客", "海底捞", "喜茶", "奈雪", "茶百道", "蜜雪冰城", "美团", "饿了么"],
+    "交通": ["打车", "滴滴", "地铁", "公交", "高铁", "飞机", "加油", "停车", "过路费",
+             "共享单车", "哈啰", "青桔", "曹操", "高德", "12306", "携程"],
+    "购物": ["淘宝", "京东", "拼多多", "拼多多", "天猫", "超市", "商场", "便利店",
+             "711", "全家", "盒马", "山姆", "Costco", "网购"],
+    "居住": ["房租", "水电", "燃气", "物业", "宽带", "话费", "电费", "水费"],
+    "娱乐": ["电影", "游戏", "会员", "视频", "音乐", "KTV", "剧本杀", "密室"],
+    "社交": ["红包", "礼物", "请客", "聚餐", "份子钱", "结婚", "随礼"],
+    "旅游": ["酒店", "民宿", "机票", "景点", "门票", "旅游", "旅行"],
+    "车辆": ["车贷", "保养", "维修", "洗车", "停车费", "ETC", "违章"],
+    "医疗": ["医院", "药店", "体检", "挂号", "门诊", "牙科", "眼科"],
+    "个护": ["理发", "美容", "护肤", "化妆品", "美甲"],
+    "学习": ["课程", "培训", "书籍", "考试", "学费"],
+    "数字消费": ["话费", "流量", "会员", "订阅", "云服务", "域名"],
+}
+
+
+def _build_keyword_category_map():
+    """从历史数据构建关键词→分类映射"""
+    mapping = defaultdict(lambda: defaultdict(int))
+
+    # 1. 从 CSV 历史数据学习
+    try:
+        df = load_v4()
+        valid = df[df["valid_for_stats"] == "True"]
+        for _, row in valid.iterrows():
+            project = str(row.get("clean_project", "")).strip()
+            cat = row.get("category_l1", "")
+            if project and cat:
+                # 提取关键词（按空格/标点分割）
+                for word in re.split(r"[\s,，.。、/\\]+", project):
+                    word = word.strip()
+                    if len(word) >= 2:
+                        mapping[word][cat] += 1
+    except Exception:
+        pass
+
+    # 2. 从手动记账数据学习
+    try:
+        txs = _load_transactions()
+        for tx in txs:
+            note = tx.get("note", "").strip()
+            cat = tx.get("category", "")
+            if note and cat:
+                for word in re.split(r"[\s,，.。、/\\]+", note):
+                    word = word.strip()
+                    if len(word) >= 2:
+                        mapping[word][cat] += 1
+    except Exception:
+        pass
+
+    return mapping
+
+
+def suggest_category(text, top_n=3):
+    """
+    根据输入文本推荐分类。
+    返回 [{"category": "餐饮", "confidence": 0.85, "source": "历史数据"}, ...]
+    """
+    import re
+    if not text or not text.strip():
+        return []
+
+    text = text.strip()
+    results = defaultdict(lambda: {"score": 0, "source": ""})
+
+    # 1. 预置关键词匹配
+    for cat, keywords in _PRESET_CATEGORY_MAP.items():
+        for kw in keywords:
+            if kw in text:
+                results[cat]["score"] += 10
+                results[cat]["source"] = "常用规则"
+
+    # 2. 历史数据匹配
+    keyword_map = _build_keyword_category_map()
+    for word, cat_counts in keyword_map.items():
+        if word in text:
+            for cat, count in cat_counts.items():
+                results[cat]["score"] += count
+                results[cat]["source"] = "历史数据"
+
+    if not results:
+        return []
+
+    # 按分数排序，计算置信度
+    max_score = max(r["score"] for r in results.values())
+    sorted_results = sorted(results.items(), key=lambda x: -x[1]["score"])[:top_n]
+
+    return [
+        {
+            "category": cat,
+            "confidence": round(data["score"] / max_score, 2) if max_score > 0 else 0,
+            "source": data["source"],
+        }
+        for cat, data in sorted_results
+    ]
+
+
+def get_category_stats():
+    """获取各分类的统计信息（用于智能推荐）"""
+    df = load_v4()
+    valid = df[df["valid_for_stats"] == "True"]
+    expense = valid[valid["corrected_type"] == "支出"]
+
+    stats = {}
+    for cat in expense["category_l1"].unique():
+        cat_data = expense[expense["category_l1"] == cat]
+        stats[cat] = {
+            "count": len(cat_data),
+            "total": round(cat_data["cny_amount"].sum(), 2),
+            "avg": round(cat_data["cny_amount"].mean(), 2),
+            "top_projects": cat_data["clean_project"].value_counts().head(5).to_dict(),
+        }
+    return stats
