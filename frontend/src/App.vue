@@ -22,6 +22,7 @@
             <el-icon><TrendCharts /></el-icon><span>分析</span>
           </template>
           <el-menu-item index="/spending">支出分析</el-menu-item>
+          <el-menu-item index="/habits">消费习惯</el-menu-item>
           <el-menu-item index="/income">收入分析</el-menu-item>
           <el-menu-item index="/portfolio">持仓盈亏</el-menu-item>
           <el-menu-item index="/report">月度报告</el-menu-item>

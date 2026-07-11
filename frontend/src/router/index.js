@@ -11,12 +11,14 @@ import Alerts from '../views/Alerts.vue'
 import Goals from '../views/Goals.vue'
 import AIQuery from '../views/AIQuery.vue'
 import Settings from '../views/Settings.vue'
+import Habits from '../views/Habits.vue'
 import { checkAuth } from '../api/index.js'
 
 const routes = [
   { path: '/login', name: '登录', component: Login },
   { path: '/', name: '总览', component: Overview, meta: { requiresAuth: true } },
   { path: '/spending', name: '支出分析', component: Spending, meta: { requiresAuth: true } },
+  { path: '/habits', name: '消费习惯', component: Habits, meta: { requiresAuth: true } },
   { path: '/income', name: '收入分析', component: Income, meta: { requiresAuth: true } },
   { path: '/forecast', name: '支出预测', component: Forecast, meta: { requiresAuth: true } },
   { path: '/simulation', name: '情景模拟', component: Simulation, meta: { requiresAuth: true } },

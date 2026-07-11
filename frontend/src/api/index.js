@@ -23,6 +23,7 @@ export function fetchOverview() { return api.get('/overview').then(r => r.data) 
 export function fetchSpending(year = 'all') {
   return api.get(`/spending`, { params: { year } }).then(r => r.data)
 }
+export function fetchSpendingHabits() { return api.get('/spending/habits').then(r => r.data) }
 export function fetchSpendingDetail(category, year = 'all') {
   return api.get(`/spending/${category}`, { params: { year } }).then(r => r.data)
 }

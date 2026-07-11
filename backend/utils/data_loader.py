@@ -1788,3 +1788,255 @@ def get_category_stats():
             "top_projects": cat_data["clean_project"].value_counts().head(5).to_dict(),
         }
     return stats
+
+
+# ===================== 消费习惯分析 =====================
+
+def get_spending_habits():
+    """
+    综合消费习惯分析，返回多维度洞察。
+    """
+    from datetime import datetime
+    now = datetime.now()
+    current_month = now.strftime("%Y-%m")
+
+    df = load_v4()
+    valid = df[df["valid_for_stats"] == "True"]
+    expense = valid[valid["corrected_type"] == "支出"]
+
+    result = {}
+
+    # 1. 星期消费模式
+    result["weekday_pattern"] = _analyze_weekday_pattern(expense)
+
+    # 2. 月内消费节奏（每月哪几天花钱多）
+    result["monthly_rhythm"] = _analyze_monthly_rhythm(expense)
+
+    # 3. 分类趋势（最近6个月各分类变化）
+    result["category_trends"] = _analyze_category_trends(expense)
+
+    # 4. 消费频率分析
+    result["spending_frequency"] = _analyze_spending_frequency(expense)
+
+    # 5. 消费速度（本月 vs 历史月均）
+    result["spending_velocity"] = _analyze_spending_velocity(expense, current_month)
+
+    # 6. 消费集中度（TOP3分类占比）
+    result["concentration"] = _analyze_concentration(expense, current_month)
+
+    return result
+
+
+def _analyze_weekday_pattern(expense):
+    """分析星期消费模式"""
+    day_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    expense = expense.copy()
+    expense["weekday"] = expense["clean_date"].dt.weekday
+
+    weekday_stats = []
+    for day in range(7):
+        day_data = expense[expense["weekday"] == day]
+        if len(day_data) > 0:
+            weekday_stats.append({
+                "day": day_names[day],
+                "day_num": day,
+                "total": round(day_data["cny_amount"].sum(), 2),
+                "count": len(day_data),
+                "avg": round(day_data["cny_amount"].mean(), 2),
+            })
+
+    # 找出消费最高和最低的星期
+    if weekday_stats:
+        peak = max(weekday_stats, key=lambda x: x["total"])
+        low = min(weekday_stats, key=lambda x: x["total"])
+        return {
+            "data": weekday_stats,
+            "peak_day": peak["day"],
+            "low_day": low["day"],
+            "insight": f"你通常在{peak['day']}花钱最多（¥{peak['total']:,.0f}），{low['day']}最少",
+        }
+    return {"data": [], "peak_day": "", "low_day": "", "insight": ""}
+
+
+def _analyze_monthly_rhythm(expense):
+    """分析月内消费节奏（每月上/中/下旬分布）"""
+    expense = expense.copy()
+    expense["day"] = expense["clean_date"].dt.day
+
+    periods = [
+        ("上旬", 1, 10),
+        ("中旬", 11, 20),
+        ("下旬", 21, 31),
+    ]
+
+    rhythm = []
+    for name, start, end in periods:
+        period_data = expense[(expense["day"] >= start) & (expense["day"] <= end)]
+        if len(period_data) > 0:
+            rhythm.append({
+                "period": name,
+                "total": round(period_data["cny_amount"].sum(), 2),
+                "count": len(period_data),
+                "avg": round(period_data["cny_amount"].mean(), 2),
+            })
+
+    if rhythm:
+        peak = max(rhythm, key=lambda x: x["total"])
+        return {
+            "data": rhythm,
+            "peak_period": peak["period"],
+            "insight": f"你通常在{peak['period']}消费最多",
+        }
+    return {"data": [], "peak_period": "", "insight": ""}
+
+
+def _analyze_category_trends(expense):
+    """分析最近6个月各分类支出趋势"""
+    from datetime import datetime
+    now = datetime.now()
+
+    # 获取最近6个月
+    months = []
+    for i in range(5, -1, -1):
+        m = now.month - i
+        y = now.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        months.append(f"{y}-{m:02d}")
+
+    # 按月按分类汇总
+    trends = {}
+    for month in months:
+        month_data = expense[expense["month"] == month]
+        cat_totals = month_data.groupby("category_l1")["cny_amount"].sum()
+        for cat, total in cat_totals.items():
+            if cat not in trends:
+                trends[cat] = []
+            trends[cat].append({"month": month, "amount": round(total, 2)})
+
+    # 计算趋势（线性回归斜率）
+    results = []
+    for cat, data in trends.items():
+        if len(data) >= 2:
+            amounts = [d["amount"] for d in data]
+            # 简单斜率：(最后一个月 - 第一个月) / 月数
+            slope = (amounts[-1] - amounts[0]) / len(amounts)
+            trend_pct = (amounts[-1] - amounts[0]) / amounts[0] * 100 if amounts[0] > 0 else 0
+            results.append({
+                "category": cat,
+                "data": data,
+                "slope": round(slope, 2),
+                "trend_pct": round(trend_pct, 1),
+                "trend": "上升" if slope > 0 else ("下降" if slope < 0 else "持平"),
+            })
+
+    results.sort(key=lambda x: abs(x["trend_pct"]), reverse=True)
+    return results[:5]  # 返回变化最大的5个分类
+
+
+def _analyze_spending_frequency(expense):
+    """分析消费频率"""
+    expense = expense.copy()
+    expense["date"] = expense["clean_date"].dt.date
+
+    # 每月平均消费天数
+    daily = expense.groupby("month")["date"].nunique()
+    avg_days = round(daily.mean(), 1) if len(daily) > 0 else 0
+
+    # 每天平均消费笔数
+    total_days = expense["date"].nunique()
+    avg_tx_per_day = round(len(expense) / max(total_days, 1), 1)
+
+    # 单笔平均金额
+    avg_per_tx = round(expense["cny_amount"].mean(), 2) if len(expense) > 0 else 0
+
+    # 大额消费占比（单笔>500）
+    big_tx = expense[expense["cny_amount"] > 500]
+    big_tx_ratio = round(len(big_tx) / max(len(expense), 1) * 100, 1)
+
+    return {
+        "avg_spend_days_per_month": avg_days,
+        "avg_tx_per_day": avg_tx_per_day,
+        "avg_per_transaction": avg_per_tx,
+        "big_tx_ratio": big_tx_ratio,
+        "insight": f"你平均每月{avg_days}天有消费，每天{avg_tx_per_day}笔，单笔均额¥{avg_per_tx:,.0f}",
+    }
+
+
+def _analyze_spending_velocity(expense, current_month):
+    """分析消费速度（本月 vs 历史月均）"""
+    from datetime import datetime
+    now = datetime.now()
+    day_of_month = now.day
+
+    # 本月数据
+    current = expense[expense["month"] == current_month]
+    current_total = current["cny_amount"].sum()
+
+    # 历史月均（排除本月）
+    historical = expense[expense["month"] != current_month]
+    if len(historical) > 0:
+        monthly_totals = historical.groupby("month")["cny_amount"].sum()
+        avg_monthly = monthly_totals.mean()
+    else:
+        avg_monthly = 0
+
+    # 预测本月总额（按当前速度）
+    if day_of_month > 0 and avg_monthly > 0:
+        projected = current_total / day_of_month * 30
+        deviation = (projected - avg_monthly) / avg_monthly * 100 if avg_monthly > 0 else 0
+    else:
+        projected = current_total
+        deviation = 0
+
+    if deviation > 20:
+        status = "偏快"
+        insight = f"本月消费速度比历史月均快{deviation:.0f}%，预计本月总额¥{projected:,.0f}"
+    elif deviation < -20:
+        status = "偏慢"
+        insight = f"本月消费速度比历史月均慢{abs(deviation):.0f}%，预计本月总额¥{projected:,.0f}"
+    else:
+        status = "正常"
+        insight = f"本月消费速度正常，预计本月总额¥{projected:,.0f}"
+
+    return {
+        "current_total": round(current_total, 2),
+        "avg_monthly": round(avg_monthly, 2),
+        "projected": round(projected, 2),
+        "deviation_pct": round(deviation, 1),
+        "status": status,
+        "insight": insight,
+    }
+
+
+def _analyze_concentration(expense, current_month):
+    """分析消费集中度"""
+    current = expense[expense["month"] == current_month]
+    if len(current) == 0:
+        return {"top3_ratio": 0, "top3_categories": [], "insight": ""}
+
+    cat_totals = current.groupby("category_l1")["cny_amount"].sum().sort_values(ascending=False)
+    total = cat_totals.sum()
+
+    top3 = cat_totals.head(3)
+    top3_ratio = round(top3.sum() / total * 100, 1) if total > 0 else 0
+
+    top3_info = [
+        {"category": cat, "amount": round(amt, 2), "ratio": round(amt / total * 100, 1) if total > 0 else 0}
+        for cat, amt in top3.items()
+    ]
+
+    if top3_ratio > 70:
+        insight = f"消费高度集中在{top3_info[0]['category']}等{len(top3_info)}个分类（占比{top3_ratio}%）"
+    elif top3_ratio > 50:
+        insight = f"消费较集中，TOP3分类占比{top3_ratio}%"
+    else:
+        insight = "消费较分散，各分类占比均衡"
+
+    return {
+        "top3_ratio": top3_ratio,
+        "top3_categories": top3_info,
+        "total_categories": len(cat_totals),
+        "insight": insight,
+    }

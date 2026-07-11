@@ -9,7 +9,7 @@ from auth import login, check_token, require_auth, is_auth_configured
 from utils import db, llm
 db.set_db_path(DB_PATH)
 from utils.query_engine import QueryEngine
-from utils.data_loader import get_overview, get_spending, get_monthly_trend, get_category_detail, get_income_analysis, get_asset_history, get_portfolio, get_seasonal_patterns, get_budget_status, get_monthly_report, update_assets, update_budget, get_alerts, resolve_alert, get_goals, create_goal, update_goal, delete_goal, get_financial_health, get_comparison, get_annual_report, add_transaction, delete_transaction, get_quick_stats, pay_credit_card, get_credit_card_status, suggest_category, get_templates, create_template, delete_template, apply_template
+from utils.data_loader import get_overview, get_spending, get_monthly_trend, get_category_detail, get_income_analysis, get_asset_history, get_portfolio, get_seasonal_patterns, get_budget_status, get_monthly_report, update_assets, update_budget, get_alerts, resolve_alert, get_goals, create_goal, update_goal, delete_goal, get_financial_health, get_comparison, get_annual_report, add_transaction, delete_transaction, get_quick_stats, pay_credit_card, get_credit_card_status, suggest_category, get_templates, create_template, delete_template, apply_template, get_spending_habits
 from utils.pipeline import run_full_pipeline, run_forecast_only
 
 app = Flask(__name__, static_folder=None)
@@ -319,6 +319,12 @@ def api_spending():
 def api_spending_detail(category):
     year = request.args.get("year", "all")
     return jsonify(get_category_detail(category, year))
+
+
+@app.route("/api/spending/habits")
+def api_spending_habits():
+    """消费习惯分析"""
+    return jsonify(get_spending_habits())
 
 
 @app.route("/api/monthly")
