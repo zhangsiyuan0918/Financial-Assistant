@@ -152,7 +152,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { fetchTransactions, fetchCreditCard, payCreditCard } from '../api/index.js'
+import { fetchTransactions, fetchCreditCard, payCreditCard, addTransactionApi, deleteTransactionApi, fetchCurrentAnalysis, fetchAccountsApi } from '../api/index.js'
 
 const emit = defineEmits(['recorded', 'deleted'])
 
@@ -187,11 +187,7 @@ async function submit() {
   if (!form.value.amount || !form.value.category) return
   loading.value = true
   try {
-    const res = await fetch('/api/transaction', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form.value, date: form.value.date }),
-    }).then(r => r.json())
+    const res = await addTransactionApi({ ...form.value, date: form.value.date })
 
     if (res.error) {
       ElMessage.error(res.error)
@@ -232,7 +228,7 @@ async function loadHistory() {
 
 async function deleteTx(tx) {
   try {
-    await fetch(`/api/transaction/${encodeURIComponent(tx.created_at)}`, { method: 'DELETE' })
+    await deleteTransactionApi(tx.created_at)
     ElMessage.success('已删除')
     loadHistory()
     loadCreditCard()
@@ -245,8 +241,7 @@ async function deleteTx(tx) {
 
 async function refreshAnalysis() {
   try {
-    const res = await fetch('/api/analysis/current').then(r => r.json())
-    analysis.value = res
+    analysis.value = await fetchCurrentAnalysis()
   } catch (e) {
     analysis.value = null
   }
@@ -256,8 +251,7 @@ onMounted(async () => {
   loadHistory()
   loadCreditCard()
   try {
-    const res = await fetch('/api/accounts').then(r => r.json())
-    accounts.value = res
+    accounts.value = await fetchAccountsApi()
   } catch {}
 })
 

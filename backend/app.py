@@ -16,6 +16,31 @@ app = Flask(__name__, static_folder=None)
 CORS(app)
 DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist")
 
+# ---- 认证中间件：拦截所有 /api/ 请求 ----
+PUBLIC_API_ROUTES = {"/api/auth/login", "/api/auth/status", "/api/health"}
+
+
+@app.before_request
+def check_api_auth():
+    """对所有 /api/ 路由强制认证（公开路由除外）"""
+    if not request.path.startswith("/api/"):
+        return None  # 非 API 请求放行
+    if request.path in PUBLIC_API_ROUTES:
+        return None  # 公开路由放行
+
+    # 检查密码是否已配置
+    from auth import _load_auth, check_token
+    auth_data = _load_auth()
+    if not auth_data or not auth_data.get("password_hash"):
+        return None  # 未配置密码，放行（首次使用）
+
+    # 检查 token
+    token = request.headers.get("X-Auth-Token", "")
+    if not token or not check_token(token):
+        return jsonify({"error": "未认证，请先登录"}), 401
+
+    return None
+
 
 def serve_frontend(path="index.html"):
     file_path = os.path.join(DIST_DIR, path)

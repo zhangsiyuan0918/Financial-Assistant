@@ -96,3 +96,7 @@ export function checkBudget(data) { return api.post('/budget/check', data).then(
 export function fetchTransactions(month) { return api.get('/transactions', { params: { month } }).then(r => r.data) }
 export function fetchCreditCard() { return api.get('/credit-card').then(r => r.data) }
 export function payCreditCard(data) { return api.post('/credit-card/pay', data).then(r => r.data) }
+export function addTransactionApi(data) { return api.post('/transaction', data).then(r => r.data) }
+export function deleteTransactionApi(created_at) { return api.delete(`/transaction/${encodeURIComponent(created_at)}`).then(r => r.data) }
+export function fetchCurrentAnalysis() { return api.get('/analysis/current').then(r => r.data) }
+export function fetchAccountsApi() { return api.get('/accounts').then(r => r.data) }

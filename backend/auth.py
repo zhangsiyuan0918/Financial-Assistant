@@ -1,5 +1,6 @@
 import bcrypt, os, json, secrets, time
 from datetime import datetime, timedelta
+from functools import wraps
 
 AUTH_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "auth.json")
 TOKENS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "auth_tokens.json")
@@ -117,12 +118,29 @@ def check_token(token):
     return True
 
 
-def require_auth():
-    """如果配置了密码但未认证，返回 'unauthorized'；否则 None"""
-    data = _load_auth()
-    if not data:
-        return None
-    return "unauthorized"
+# ---- Auth decorator ----
+
+# 不需要认证的路由
+PUBLIC_ROUTES = {"/api/auth/login", "/api/auth/status", "/api/health"}
+
+
+def require_auth(f):
+    """认证装饰器：检查请求头中的 X-Auth-Token"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # 如果没有配置密码，跳过认证（首次使用）
+        data = _load_auth()
+        if not data or not data.get("password_hash"):
+            return f(*args, **kwargs)
+
+        # 检查 token
+        from flask import request, jsonify
+        token = request.headers.get("X-Auth-Token", "")
+        if not token or not check_token(token):
+            return jsonify({"error": "未认证，请先登录"}), 401
+
+        return f(*args, **kwargs)
+    return decorated
 
 
 # Load persisted tokens on import
