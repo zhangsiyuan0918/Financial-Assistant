@@ -80,6 +80,12 @@
       <div ref="netWorthChart" style="height:180px"></div>
     </el-card>
 
+    <!-- Liquid assets trend -->
+    <el-card style="margin-top:4px">
+      <template #header><span style="font-size:14px">活期资产走势（现金 + 投资）</span></template>
+      <div ref="liquidChart" style="height:180px"></div>
+    </el-card>
+
     <!-- Asset detail + Budget in one row -->
     <el-row :gutter="8" style="margin-top:4px">
       <el-col :xs="24" :sm="14">
@@ -203,6 +209,7 @@ const budget = ref({ items: [] })
 const alerts = ref([])
 const layerChart = ref(null)
 const netWorthChart = ref(null)
+const liquidChart = ref(null)
 const editVisible = ref(false)
 const editForm = ref([])
 const budgetEditVisible = ref(false)
@@ -330,9 +337,29 @@ onMounted(async () => {
         xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45 } },
         yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
         series: [{
-          name: '总资产', type: 'line', data: data.map(d => d.total),
+          name: '净资产', type: 'line', data: data.map(d => d.total),
           smooth: true, areaStyle: { opacity: 0.15 }, lineStyle: { width: 2 },
         }],
+      })
+    }
+    // Liquid assets trend (cash + investment)
+    if (liquidChart.value && assetHistory.value.length) {
+      const data = assetHistory.value
+      createChart(liquidChart.value, {
+        tooltip: { trigger: 'axis', formatter: params => {
+          let s = params[0].axisValue + '<br/>'
+          params.forEach(p => { s += `${p.marker} ${p.seriesName}: ¥${Number(p.value).toLocaleString()}<br/>` })
+          return s
+        }},
+        legend: { bottom: 0 },
+        grid: { left: 60, right: 20, bottom: 40 },
+        xAxis: { type: 'category', data: data.map(d => d.month), axisLabel: { rotate: 45 } },
+        yAxis: { type: 'value', axisLabel: { formatter: '¥{value}' } },
+        series: [
+          { name: '现金/活期', type: 'bar', stack: 'liquid', data: data.map(d => d.cash_and_liquid), itemStyle: { color: '#409eff' } },
+          { name: '投资资产', type: 'bar', stack: 'liquid', data: data.map(d => d.investment), itemStyle: { color: '#e6a23c' } },
+          { name: '合计', type: 'line', data: data.map(d => d.cash_and_liquid + d.investment), lineStyle: { width: 2 }, itemStyle: { color: '#67c23a' } },
+        ],
       })
     }
   })
