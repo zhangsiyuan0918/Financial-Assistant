@@ -119,12 +119,22 @@ def api_add_transaction():
     note = data.get("note", "")
     tx_type = data.get("type", "支出")
     date = data.get("date")
+    account = data.get("account", "")
 
     if not amount or not category:
         return jsonify({"error": "金额和分类必填"}), 400
 
-    result = add_transaction(float(amount), category, note, tx_type, date)
+    result = add_transaction(float(amount), category, note, tx_type, date, account)
     return jsonify(result)
+
+
+@app.route("/api/accounts")
+def api_list_accounts():
+    from utils.data_loader import DEFAULT_ACCOUNTS, _load_transactions
+    txs = _load_transactions()
+    used = list(set(t.get("account", "") for t in txs if t.get("account")))
+    accounts = list(dict.fromkeys(DEFAULT_ACCOUNTS + used))
+    return jsonify(accounts)
 
 
 @app.route("/api/transactions")

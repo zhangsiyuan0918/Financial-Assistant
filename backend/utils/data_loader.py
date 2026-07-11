@@ -1102,7 +1102,10 @@ def get_forecast_backtest():
 # ===================== 实时记账 =====================
 
 TRANSACTIONS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "实时记账.csv")
-TRANSACTION_FIELDS = ["date", "amount", "category", "type", "note", "created_at"]
+TRANSACTION_FIELDS = ["date", "amount", "category", "type", "account", "note", "created_at"]
+
+# 常用账户
+DEFAULT_ACCOUNTS = ["招行储蓄卡", "微信零钱", "现金", "信用卡"]
 
 
 def _load_transactions():
@@ -1131,7 +1134,7 @@ def delete_transaction(created_at):
     return False
 
 
-def add_transaction(amount, category, note="", tx_type="支出", date=None):
+def add_transaction(amount, category, note="", tx_type="支出", date=None, account=""):
     """记一笔账并返回实时分析"""
     from datetime import datetime
     now = datetime.now()
@@ -1143,8 +1146,9 @@ def add_transaction(amount, category, note="", tx_type="支出", date=None):
         "amount": str(round(float(amount), 2)),
         "category": category,
         "type": tx_type,
+        "account": account,
         "note": note,
-        "created_at": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "created_at": now.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
     }
 
     transactions = _load_transactions()

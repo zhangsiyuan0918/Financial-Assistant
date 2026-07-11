@@ -14,18 +14,23 @@
 
     <el-form :model="form" inline size="default">
       <el-form-item label="日期">
-        <el-date-picker v-model="form.date" type="date" value-format="YYYY-MM-DD" style="width:130px" :shortcuts="dateShortcuts" />
+        <el-date-picker v-model="form.date" type="date" value-format="YYYY-MM-DD" style="width:120px" :shortcuts="dateShortcuts" />
       </el-form-item>
       <el-form-item label="金额">
-        <el-input-number v-model="form.amount" :min="0.01" :step="10" :precision="2" style="width:120px" placeholder="0.00" />
+        <el-input-number v-model="form.amount" :min="0.01" :step="10" :precision="2" style="width:110px" placeholder="0.00" />
       </el-form-item>
       <el-form-item label="分类">
-        <el-select v-model="form.category" style="width:100px" placeholder="分类">
+        <el-select v-model="form.category" style="width:90px" placeholder="分类">
           <el-option v-for="cat in categories" :key="cat" :label="cat" :value="cat" />
         </el-select>
       </el-form-item>
+      <el-form-item label="账户">
+        <el-select v-model="form.account" style="width:110px" placeholder="账户">
+          <el-option v-for="acc in accounts" :key="acc" :label="acc" :value="acc" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="备注">
-        <el-input v-model="form.note" style="width:120px" placeholder="可选" clearable />
+        <el-input v-model="form.note" style="width:100px" placeholder="可选" clearable />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="submit" :loading="loading" :disabled="!form.amount || !form.category">
@@ -114,7 +119,7 @@ const dateShortcuts = [
   { text: '前天', value: daysAgo(2) },
 ]
 
-const form = ref({ date: today(), amount: null, category: '', note: '' })
+const form = ref({ date: today(), amount: null, category: '', account: '', note: '' })
 const loading = ref(false)
 const analysis = ref(null)
 const showHistory = ref(false)
@@ -122,6 +127,7 @@ const historyList = ref([])
 const historyMonths = ref([])
 const historyMonth = ref('')
 const historyLoading = ref(false)
+const accounts = ref([])
 
 async function submit() {
   if (!form.value.amount || !form.value.category) return
@@ -142,7 +148,7 @@ async function submit() {
     ElMessage.success('记账成功')
     emit('recorded', res)
 
-    form.value = { date: today(), amount: null, note: '', category: '' }
+    form.value = { date: today(), amount: null, note: '', category: '', account: '' }
 
     if (showHistory.value) loadHistory()
   } catch (e) {
@@ -180,7 +186,13 @@ async function deleteTx(tx) {
   }
 }
 
-onMounted(() => { loadHistory() })
+onMounted(async () => {
+  loadHistory()
+  try {
+    const res = await fetch('/api/accounts').then(r => r.json())
+    accounts.value = res
+  } catch {}
+})
 </script>
 
 <style scoped>
