@@ -1,15 +1,7 @@
 <template>
   <el-card class="quick-entry">
     <template #header>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <el-space>
-          <span style="font-size:14px;font-weight:bold">记一笔</span>
-          <el-tag size="small" type="success">实时分析</el-tag>
-        </el-space>
-        <el-button size="small" text @click="showHistory = !showHistory">
-          {{ showHistory ? '收起' : '历史记录' }}
-        </el-button>
-      </div>
+      <span style="font-size:14px;font-weight:bold">记一笔</span>
     </template>
 
     <el-form :model="form" inline size="default">
@@ -45,6 +37,12 @@
         </el-button>
       </el-form-item>
     </el-form>
+
+    <div style="margin-top:8px">
+      <el-button size="small" @click="showHistory = !showHistory">
+        {{ showHistory ? '收起历史' : '查看历史记录' }}
+      </el-button>
+    </div>
 
     <!-- 分析结果 -->
     <div v-if="analysis" class="analysis-result">
