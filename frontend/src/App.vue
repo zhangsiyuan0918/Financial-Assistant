@@ -130,7 +130,7 @@ body { margin: 0; font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, 
   flex-direction: column;
 }
 .sidebar-logo {
-  padding: 16px;
+  padding: 8px;
   color: #fff;
   text-align: center;
   border-bottom: 1px solid rgba(255,255,255,.1);
