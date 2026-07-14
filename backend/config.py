@@ -43,7 +43,7 @@ ASSET_LAYERS = {
 
 # 负债拆分
 DEBT = {}  # 无有息债务
-BILLS_PAYABLE = {"信用卡（下月账单）": 1450.90}
+BILLS_PAYABLE = {"信用卡（下月账单）": 1413.71}
 
 # 信用卡账单文件
 CREDIT_CARD_FILE = os.path.join(DATA_DIR, "信用卡账单.json")

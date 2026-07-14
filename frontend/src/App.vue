@@ -14,37 +14,11 @@
         class="sidebar-menu"
       >
         <el-menu-item index="/">
-          <el-icon><DataBoard /></el-icon><span>总览</span>
-        </el-menu-item>
-
-        <el-sub-menu index="analysis">
-          <template #title>
-            <el-icon><TrendCharts /></el-icon><span>分析</span>
-          </template>
-          <el-menu-item index="/spending">支出分析</el-menu-item>
-          <el-menu-item index="/habits">消费习惯</el-menu-item>
-          <el-menu-item index="/income">收入分析</el-menu-item>
-          <el-menu-item index="/portfolio">持仓盈亏</el-menu-item>
-          <el-menu-item index="/report">月度报告</el-menu-item>
-        </el-sub-menu>
-
-        <el-sub-menu index="planning">
-          <template #title>
-            <el-icon><MagicStick /></el-icon><span>规划</span>
-          </template>
-          <el-menu-item index="/forecast">支出预测</el-menu-item>
-          <el-menu-item index="/simulation">情景模拟</el-menu-item>
-          <el-menu-item index="/goals">目标管理</el-menu-item>
-        </el-sub-menu>
-
-        <el-menu-item index="/alerts">
-          <el-icon><WarningFilled /></el-icon>
-          <span>预警</span>
-          <el-badge v-if="alertCount" :value="alertCount" :max="99" class="alert-badge" />
-        </el-menu-item>
-
-        <el-menu-item index="/ai">
           <el-icon><ChatDotRound /></el-icon><span>AI 助手</span>
+        </el-menu-item>
+
+        <el-menu-item index="/status">
+          <el-icon><DataBoard /></el-icon><span>状态</span>
         </el-menu-item>
 
         <el-menu-item index="/settings">
@@ -74,26 +48,25 @@
     <el-icon class="is-loading" :size="24"><Loading /></el-icon>
     <span>加载中...</span>
   </div>
+
+  <!-- Global AI Float - hidden, AI is built into the main page -->
+  <!-- <AiFloat /> -->
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, provide } from 'vue'
+import { ref, onMounted, onUnmounted, provide } from 'vue'
 import { useRoute } from 'vue-router'
-import { pollAlerts } from './api/index.js'
+import AiFloat from './components/AiFloat.vue'
 
 const route = useRoute()
 const isMobile = ref(false)
 const globalLoading = ref(false)
-const alertCount = ref(0)
-let alertTimer = null
 
 provide('globalLoading', globalLoading)
 
 const mobileNavItems = [
-  { path: '/', label: '总览', icon: 'DataBoard' },
-  { path: '/spending', label: '分析', icon: 'TrendCharts' },
-  { path: '/simulation', label: '规划', icon: 'MagicStick' },
-  { path: '/ai', label: 'AI', icon: 'ChatDotRound' },
+  { path: '/', label: 'AI 助手', icon: 'ChatDotRound' },
+  { path: '/status', label: '状态', icon: 'DataBoard' },
   { path: '/settings', label: '设置', icon: 'Setting' },
 ]
 
@@ -101,23 +74,13 @@ function checkMobile() {
   isMobile.value = window.innerWidth < 768
 }
 
-async function checkAlerts() {
-  try {
-    const res = await pollAlerts()
-    alertCount.value = res.new_count || 0
-  } catch {}
-}
-
 onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
-  checkAlerts()
-  alertTimer = setInterval(checkAlerts, 300000) // every 5 min
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
-  if (alertTimer) clearInterval(alertTimer)
 })
 </script>
 
@@ -142,9 +105,6 @@ body { margin: 0; font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, 
   flex: 1;
   overflow-y: auto;
 }
-
-/* Alert badge in sidebar */
-.alert-badge { margin-left: 8px; }
 
 /* Mobile: hide sidebar */
 .mobile-hidden { display: none; }

@@ -150,13 +150,16 @@ class QueryEngine:
                 history_str += f"{role}: {msg['content']}\n"
 
         system_prompt = (
-            "你是一个个人财务助手。根据用户的财务数据回答问题。\n\n"
-            "## 规则\n"
-            "- 金额用中文表示（如 1.2万元、500元）\n"
-            "- 回答简洁，2-3句话，数据驱动\n"
-            "- 不要问用户要数据，数据已经提供\n"
-            "- 如果需要查历史交易明细，使用下方的 SQL 工具\n"
-            "- 不确定就说不知道\n\n"
+            "你是一个友善的个人财务助手，像朋友一样和用户聊天。\n\n"
+            "## 风格\n"
+            "- 用轻松自然的语气，像朋友间的对话\n"
+            "- 可以用 emoji，但不要过度\n"
+            "- 先说结论，再解释原因\n"
+            "- 金额用中文（如 1.2万、500块）\n"
+            "- 如果发现异常或有建议，主动提醒用户\n"
+            "- 回答不要太长，3-5句话就够\n"
+            "- 不确定就说不知道，不要编造数据\n"
+            "- 可以给出具体的省钱建议和预算优化方案\n\n"
             "## 当前财务数据\n" + context + history_str + "\n\n"
             "## SQL 查询工具\n"
             "如果用户问的是具体的某笔消费、某个时间段的明细、或需要聚合计算，"
@@ -170,6 +173,7 @@ class QueryEngine:
             "- 最近N月 = range\n"
             "- 今年 = 今年1月至今\n"
             "- 去年 = 去年全年\n"
+            "- 月底 = 预测本月总额\n"
         )
 
         response = llm.ask(question, system_prompt)
@@ -222,6 +226,8 @@ class QueryEngine:
             "health": self._health,
             "monthly_report": self._monthly_report,
             "spending_trend": self._spending_trend,
+            "prediction": self._prediction,
+            "advice": self._advice,
             "help": self._help,
         }
         handler = handlers.get(intent, self._fallback)
@@ -237,6 +243,12 @@ class QueryEngine:
 
         if any(w in q for w in ["帮助", "能做什么", "怎么用", "功能", "你会什么"]):
             intent = "help"
+        elif any(w in q for w in ["预测", "预计", "估计", "月底", "下个月会"]):
+            intent = "prediction"
+        elif any(w in q for w in ["建议", "怎么省", "省钱", "控制", "优化", "怎么花", "帮我"]):
+            intent = "advice"
+        elif any(w in q for w in ["趋势", "走势", "逐月", "变化趋势"]):
+            intent = "spending_trend"
         elif any(w in q for w in ["净资产", "总资产", "我有多少钱", "身家"]):
             intent = "net_worth"
         elif any(w in q for w in ["流动性", "能撑", "能花多少", "可用资金"]):
@@ -263,8 +275,6 @@ class QueryEngine:
             intent = "total_expense"
         elif any(w in q for w in ["花了", "支出", "用了"]):
             intent = "category_expense" if entities["category"] else "total_expense"
-        elif any(w in q for w in ["趋势", "走势", "逐月", "变化趋势"]):
-            intent = "spending_trend"
         elif any(w in q for w in ["报告", "月报", "月度"]):
             intent = "monthly_report"
 
@@ -430,19 +440,78 @@ class QueryEngine:
         items = [f"{t['month']} {_format_amount(t['expense'])}" for t in trend]
         return f"支出趋势：{' → '.join(items)}"
 
+    def _prediction(self, q, e):
+        """预测本月支出"""
+        from datetime import datetime
+        now = datetime.now()
+        day = now.day
+        month = now.strftime("%Y-%m")
+
+        exp, _ = self._get_month_data(month)
+        current_total = exp["cny_amount"].sum()
+
+        # 历史月均
+        trend = self.dl.get_monthly_trend()
+        if len(trend) > 1:
+            avg = sum(t["expense"] for t in trend[:-1]) / max(len(trend) - 1, 1)
+        else:
+            avg = current_total
+
+        if day > 0:
+            projected = current_total / day * 30
+            deviation = (projected - avg) / avg * 100 if avg > 0 else 0
+            if deviation > 15:
+                return f"按当前速度，{month} 月底预计支出 {_format_amount(projected)}，比历史月均高 {deviation:.0f}%，建议控制消费 📉"
+            elif deviation < -15:
+                return f"按当前速度，{month} 月底预计支出 {_format_amount(projected)}，比历史月均低 {abs(deviation):.0f}%，这个月控制得不错 👍"
+            else:
+                return f"按当前速度，{month} 月底预计支出 {_format_amount(projected)}，跟历史月均差不多，保持就好 😊"
+        return f"本月已支出 {_format_amount(current_total)}"
+
+    def _advice(self, q, e):
+        """给出省钱/优化建议"""
+        ov = self.dl.get_overview()
+        bd = self.dl.get_budget_status()
+        suggestions = []
+
+        # 预算相关
+        over = [i for i in bd["items"] if i["ratio"] >= 100]
+        warn = [i for i in bd["items"] if 80 <= i["ratio"] < 100]
+        if over:
+            for i in over:
+                suggestions.append(f"⚠️ {i['category']}已超支，建议暂停该类消费")
+        if warn:
+            for i in warn:
+                remaining = i["budget"] - i["actual"]
+                suggestions.append(f"⚡ {i['category']}快到预算上限了，只剩 {_format_amount(remaining)}")
+
+        # 流动性
+        if ov["liquidity_coverage"] < 3:
+            suggestions.append("💧 流动性偏低，建议存一些应急资金")
+
+        # 储蓄率
+        if ov["monthly_income"] > 0:
+            rate = (ov["monthly_income"] - ov["avg_monthly_expense"]) / ov["monthly_income"] * 100
+            if rate < 20:
+                suggestions.append(f"💰 储蓄率只有 {rate:.0f}%，建议每月至少存收入的 20%")
+
+        if not suggestions:
+            suggestions.append("目前财务状况看起来不错，继续保持！💪")
+
+        return "根据你的财务状况，我有这些建议：\n" + "\n".join(f"  {s}" for s in suggestions[:5])
+
     def _help(self, q=None, e=None):
         return (
             "你可以问我：\n"
             "• 「我这个月花了多少钱」\n"
             "• 「上个月吃饭花了多少」\n"
             "• 「最近3个月支出趋势」\n"
-            "• 「今年一共花了多少」\n"
+            "• 「这个月预计花多少」\n"
             "• 「我的净资产有多少」\n"
             "• 「预算还剩多少」\n"
             "• 「我的基金赚了还是亏了」\n"
-            "• 「储蓄率多少」\n"
-            "• 「2026年7月支出同比变化」\n"
-            "• 「财务健康评分」\n"
+            "• 「帮我分析一下消费习惯」\n"
+            "• 「怎么省钱」\n"
             "• 「帮我查一下上个月最大的3笔消费」（需要LLM）"
         )
 
@@ -470,6 +539,27 @@ class QueryEngine:
             for i in port["items"]
         }
 
+        # 本月数据
+        from datetime import datetime
+        now = datetime.now()
+        month = now.strftime("%Y-%m")
+        try:
+            month_bd = self.dl.get_budget_status(month)
+            month_expense = month_bd["total_actual"]
+            month_budget = month_bd["total_budget"]
+            month_ratio = month_bd["total_ratio"]
+        except Exception:
+            month_expense = ov["monthly_expense"]
+            month_budget = 0
+            month_ratio = 0
+
+        # 预测
+        day = now.day
+        if day > 0 and ov["avg_monthly_expense"] > 0:
+            projected = month_expense / day * 30
+        else:
+            projected = month_expense
+
         return json.dumps({
             "净资产": ov["net_worth"],
             "总资产": ov["total_assets"],
@@ -478,6 +568,10 @@ class QueryEngine:
             "受限资产": ov["restricted"],
             "月均收入": ov["monthly_income"],
             "月均支出": ov["avg_monthly_expense"],
+            "本月支出": month_expense,
+            "本月预算": month_budget,
+            "本月预算执行率": f"{month_ratio}%",
+            "本月预测支出": round(projected, 2),
             "流动性覆盖率": f"{ov['liquidity_coverage']}个月",
             "预算执行": {
                 "总预算": budget["total_budget"],

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div v-if="!isMobile && route.path === '/'">
     <!-- Float button -->
     <el-button circle type="primary" size="large" @click="visible = true"
       class="ai-float-btn">
@@ -43,7 +43,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, inject } from 'vue'
+import { ref, computed, nextTick, inject, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { askQuestion } from '../api/index.js'
 
@@ -54,17 +54,28 @@ const question = ref('')
 const loading = ref(false)
 const chatBox = ref(null)
 const globalLoading = inject('globalLoading', ref(false))
+const isMobile = ref(false)
+
+function checkMobile() {
+  isMobile.value = window.innerWidth < 768
+}
+
+onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+})
 
 const contextHint = computed(() => {
   const map = {
-    '/spending': '支出分析',
-    '/income': '收入分析',
-    '/forecast': '支出预测',
-    '/portfolio': '持仓盈亏',
-    '/simulation': '情景模拟',
-    '/goals': '目标管理',
-    '/report': '月度报告',
-    '/alerts': '预警中心',
+    '/': '财务总览',
+    '/book': '记账',
+    '/analysis': '数据分析',
+    '/assets': '资产',
+    '/settings': '设置',
   }
   return map[route.path] || '财务数据'
 })

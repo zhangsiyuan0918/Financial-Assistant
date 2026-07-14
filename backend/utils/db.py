@@ -41,26 +41,40 @@ def init_db():
             "day_of_week" INTEGER, "is_weekend" TEXT, "is_holiday" TEXT,
             "holiday_name" TEXT, "is_around_holiday" TEXT,
             "is_capital_expense" TEXT, "is_outlier" TEXT,
-            "life_stage" TEXT, "month_complete" TEXT, "is_purchase_support" TEXT
+            "life_stage" TEXT, "month_complete" TEXT, "is_purchase_support" TEXT,
+            "source" TEXT DEFAULT 'csv'
         );
         CREATE INDEX IF NOT EXISTS idx_trans_month ON transactions("month");
         CREATE INDEX IF NOT EXISTS idx_trans_cat ON transactions("category_l1");
         CREATE INDEX IF NOT EXISTS idx_trans_clean_date ON transactions("clean_date");
-
-        CREATE TABLE IF NOT EXISTS manual_transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT NOT NULL,
-            amount REAL NOT NULL,
-            category TEXT NOT NULL,
-            type TEXT NOT NULL DEFAULT '支出',
-            account TEXT DEFAULT '',
-            note TEXT DEFAULT '',
-            created_at TEXT NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS idx_manual_date ON manual_transactions("date");
-        CREATE INDEX IF NOT EXISTS idx_manual_month ON manual_transactions(date);
+        CREATE INDEX IF NOT EXISTS idx_trans_source ON transactions("source");
     """)
+
+    # 兼容：给已有表加缺失列
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(transactions)")
+    columns = [r[1] for r in cur.fetchall()]
+    if "source" not in columns:
+        cur.execute("ALTER TABLE transactions ADD COLUMN source TEXT DEFAULT 'csv'")
+        cur.execute("UPDATE transactions SET source='csv' WHERE source IS NULL")
+    if "created_at" not in columns:
+        cur.execute("ALTER TABLE transactions ADD COLUMN created_at TEXT DEFAULT ''")
+
+    # AI 洞察表
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ai_insights (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            insight_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            priority INTEGER DEFAULT 0,
+            is_read INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        )
+    """)
+
     conn.commit()
+
     conn.close()
 
 
@@ -92,10 +106,12 @@ def migrate_from_csv(csv_path):
     with open(csv_path, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         cols = reader.fieldnames
-        quoted_cols = [f'"{c}"' for c in cols]
-        placeholders = ",".join("?" * len(cols))
+        # 添加 source 列
+        all_cols = list(cols) + ["source"]
+        quoted_cols = [f'"{c}"' for c in all_cols]
+        placeholders = ",".join("?" * len(all_cols))
         col_names = ",".join(quoted_cols)
-        rows = [tuple(row.get(c, "") for c in cols) for row in reader]
+        rows = [tuple(row.get(c, "") for c in cols) + ("csv",) for row in reader]
 
     total_rows = len(rows)
 
